@@ -15,7 +15,10 @@ next-env.d.ts
 
 # data / cache
 data/pdfs/
-data/cache/
+data/cache/*
+# The OCR cache IS committed: Surya OCR is deterministic and CPU-expensive, so
+# committing the text output lets CI (and fresh clones) skip re-OCR entirely.
+!data/cache/ocr/
 *.log
 
 # misc

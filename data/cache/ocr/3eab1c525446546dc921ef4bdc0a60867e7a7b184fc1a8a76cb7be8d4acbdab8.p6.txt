@@ -1,0 +1,60 @@
+OGE Form 278-T (Updated February 2024)
+nstructions
+If you need more pages, follow these instructions. Note: You must said pages before entering information.
+Note: This is a public form. Do not include account numbers, street addresses, or family member names. See instructions for required information.
+Filor's Name
+Page
+Page 7 of 8
+Donald J Trump
+Transactions
+Notification
+Received Over 30
+Days Ago
+Description
+Type Date
+Amount
+AT&T INC S DEP RP PFD A - TpA
+5/7/2025
+168
+purchase
+900,0012 - 100,000 apy
+AIR LEASE CORP PERP GLBL D N 6.0000% 12/31/49
+5/7/2025
+187
+purchase
+yes $100,001 - $250,000
+BANK OF AMERICA CORPORATION - BACPI
+5/7/2025
+168
+<b>DUTCHOSS</b>
+yes $15,001 - $50,000
+BK OF AMERICA CORP PERP TT N 6.1250% 12/31/49
+5/7/2025
+169
+purchase
+yes $250,001 - $500,000
+BANK AMERICA CORP PERP GLBL 6.6250% 12/31/49
+5/7/2025
+170
+purchase
+yes $250,001 - $500,000
+CAPITAL ONE FINL CORP PERP $ 3.9500%
+5/7/2025
+171
+OUTChase
+yes $100,001 - $250,000
+MORGAN STANLEY DEP SHS REPST 6,6250% 12/31/49
+5/7/2025
+172
+purchase
+yes $1,001 - $15,000
+PNC FINL SVCS GROUP INC TIER 6,2000%
+5/7/2025
+173
+yos $250,001 - $500,000
+Ourchase
+WELLS FARGO & CO PERP NT 6.8500% 12/31/49
+5/7/2025
+174
+purchase
+ves $250,001 - $500,000

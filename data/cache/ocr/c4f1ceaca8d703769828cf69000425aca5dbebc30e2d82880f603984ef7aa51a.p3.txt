@@ -1,0 +1,36 @@
+.
+OGE Form 278-T (Updated February 2024)
+Instructions
+If you need more pages, follow these instructions. Note: You must add pages before entering information.
+Note: This is a public form. Do not include account numbers, street addresses, or family member names. See instructions for required information.
+Filer's Name
+Page
+Page 4 of 5
+16
+Donald J Trump
+Transactions
+<b>Notification Received</b>
+Description
+Over 30 Days Ago
+Type Date
+Amount
+67
+KEYCORP DP SH PFD H - KEY
+purchase
+2/4/2026
+yes $1,001 - $15,000
+KEYCORP DP SH PFD H - KEY
+68
+purchase
+2/3/2026
+yes $15,001 - $50,000
+69
+BANK OF AMERICA CORPORATION - BAC
+purchase
+yes $1,001 - $15,000
+2/2/2026
+. 10
+14
+*
+. .
+.

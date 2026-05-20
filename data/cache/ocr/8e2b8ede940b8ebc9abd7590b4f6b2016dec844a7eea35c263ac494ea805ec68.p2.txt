@@ -1,0 +1,50 @@
+OGE Form 278-T (Updated February 2024)
+Instructions
+If you need more pages, follow these instructions. Note: You must add pages before entering information.
+Note: This is a public form. Do not include account numbers, stroot addresses, or family member names. See instructions for required information.
+Filor's Name
+Pago
+Donald J Trump
+Transactions
+Description
+Type Date
+Notification
+Amount
+Received Over 30
+Days Ago
+34
+MORGAN STANLEY VAR 6.296% DUE 10/18/28
+8/28/2025
+$1,000,001 - $5,000,000
+Yes
+purchase
+35
+WELLS FARGO & CO VAR 4.897% DUE 07/25/33
+8/28/2025
+$1,000,001 - $5,000,000
+Yes
+purchase
+36
+CITIGROUP INC. VAR 2.561% DUE 05/01/32
+8/28/2025
+Yes
+$500,001 - $1,000,000
+purchaso
+37
+8/28/2025
+BANK OF AMERICA C VAR 2.884% DUE 10/22/30
+$1,000,001 - $5,000,000
+Yes
+purchase
+38
+AIR PRODUCTS AND 4.85% DUE 02/08/34
+8/28/2025
+$1,000,001 - $5,000,000
+Yes
+purchase
+39
+FNMA PL FA0887 2.5% DUE 02/01/38
+Yes
+8/28/2025
+$1,000,001 - $5,000,000
+purchaso

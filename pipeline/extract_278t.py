@@ -247,6 +247,9 @@ def _surya():
 
         # Force CPU — Surya has known Apple-MPS bugs, and CI runners are CPU-only.
         os.environ.setdefault("TORCH_DEVICE", "cpu")
+        import torch  # noqa: PLC0415
+
+        torch.set_num_threads(os.cpu_count() or 8)
         from surya.detection import DetectionPredictor  # noqa: PLC0415
         from surya.foundation import FoundationPredictor  # noqa: PLC0415
         from surya.recognition import RecognitionPredictor  # noqa: PLC0415

@@ -1,0 +1,181 @@
+OGE Form 278-T (Updated February 2024)
+instructions
+If you need more pages, follow these instructions. Note: You must sed pages before entering information.
+Note: This is a public form. Do not include account numbers, street addresses, or family member names. See instructions for required information.
+Filer's Name
+Page
+Donald J Trump
+Page 102 of 113
+Transactions
+Notification
+Received Over 30
+Days Ago
+Description
+Type
+Date
+Amount
+3299
+PENNYMAC MTG INVT TR REIT
+3/30/2026
+Yes $15,001 - $50,000
+salo
+3300
+2/26/2026
+ROBERT HALF INC
+salo
+Yes $15,001 - $50,000
+2/12/2026
+3301
+AIRBNB INC CLASS A
+sale
+Yes $15,001 - $50,000
+CMS ENERGY CORP
+1/12/2026
+3302
+salo
+Yes $15,001 - $50,000
+3303
+SNOWFLAKE INC CLASS A
+sale
+2/12/2026
+Yes $15,001 - $50,000
+SAILPOINT INC
+3304
+salo
+3/18/2026
+Yes $50,001 - $100,000
+3305
+AXON ENTERPRISE INC
+salo
+3/18/2026
+Yes $50,001 - $100,000
+3306
+COINBASE GLOBAL INC CLASS A
+2/12/2026
+sale
+Yes $50,001 - $100,000
+3307
+ELASTIC N V F
+sale
+3/18/2026
+Yes $50,001 - $100,000
+3308
+AMERICAN INTL GROUP INC
+sale
+1/12/2026
+Yes $50,001 - $100,000
+3309
+Abbvie Inc Com Solicited Order Discretion Exercised
+3/27/2026
+salo
+Yes $50,001 - $100,000
+1/12/2026
+3310
+GALLAGHER ARTHUR J & CO
+sale
+Yes $50,001 - $100,000
+3/27/2026
+3311
+Home Depot Inc Com Solicited Order Discretion Exercised Allocated Order Your Broker Acted As Agent
+sale
+Yes $50,001 - $100,000
+FASTENAL CO
+1/12/2026
+3312
+Yes $50,001 - $100,000
+sala
+ADMA BIOLOGICS INC
+3/30/2026
+3313
+sale
+Yes $50,001 - $100,000
+3/18/2026
+3314
+TPG INC CLASS A
+salo
+Yes $50,001 - $100,000
+3315
+3/30/2026
+DOUBLEVERIFY HLDGS INC
+Yes $50,001 - $100,000
+sale
+ADDUS HOMECARE CORP
+3316
+3/30/2026
+sale
+Yes $50,001 - $100,000
+INTERNATIONAL PAPER COM
+3/17/2026
+Yes $50,001 - $100,000
+3317
+sale
+General Elec Co Com New Solicited Order Discretion Exercised Average Unit Price Transaction Your Broker Acted As Agent
+3318
+3/27/2026
+Yes $50,001 - $100,000
+sale
+3319
+INSIGHT ENTERPRISES INC
+Yes $50,001 - $100,000
+3/30/2026
+SHIP
+3320
+1/26/2026
+CORCEPT THERAPEUTICS INC
+sale
+Yes $50,001 - $100,000
+WEC ENERGY GROUP INC
+1/12/2026
+3321
+sale
+Yes $50,001 - $100,000
+3322
+Berkshire Hathaway Inc Del Cl B New Solicited Order Discretion Exercised
+sale
+3/6/2026
+Yes $50,001 - $100,000
+3/30/2026
+VIRTUS INVT PARTNERS INC
+3323
+salo
+Yes $50,001 - $100,000
+3324
+LABCORP HLDGS INC
+1/12/2026
+salo
+Yes $50,001 - $100,000
+3/18/2026
+3325
+sale
+CONAGRA BRANDS INC
+Yes $50,001 - $100,000
+3326
+OTIS WORLDWIDE CORP
+3/18/2026
+sale
+Yes $50,001 - $100,000
+COUPANG INC CLASS A
+3327
+1/12/2026
+sale
+Yes $50,001 - $100,000
+3/23/2026
+3328
+DATADOG INC UNSOLICITED
+sale
+Yes $50,001 - $100,000
+3/18/2026
+3329
+LPL FINL HLDGS INC
+sale
+Yes $50,001 - $100,000
+3330
+ENERPAC TOOL GROUP CORP CLASS A
+3/30/2026
+Yes $50,001 - $100,000
+salo
+3331
+PROCTER & GAMBLE CO
+1/12/2026
+salo
+Yes $50,001 - $100,000

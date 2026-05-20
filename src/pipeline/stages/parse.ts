@@ -55,7 +55,7 @@ export interface ParseResult {
 async function runExtractor(pdfPath: string, filingDate: string): Promise<ExtractorOutput> {
   const { stdout } = await execFileAsync(PY, [SCRIPT, pdfPath, filingDate], {
     maxBuffer: 64 * 1024 * 1024,
-    timeout: 25 * 60 * 1000, // OCR of a 100+ page scan is slow
+    timeout: 110 * 60 * 1000, // Surya OCR of a 100+ page scan is CPU-slow (cached after)
   });
   return JSON.parse(stdout) as ExtractorOutput;
 }

@@ -1,0 +1,75 @@
+Page 7 of 8
+OGE Form 278-T (Updated February 2024)
+Instructions
+If you need more pages, follow these instructions, Note: You must add pages before entering information,
+Note: This is a public form. Do not include account numbers, street addresses, or family member names. See instructions for required information.
+Filer's Name
+Page
+Donald J Trump
+Transactions
+Notification
+Received Over 30
+Description
+Type Date
+Days Ago
+Amount
+***MACYS RETAIL HOLDINGS LLC REG S DUE 03/15/2030 05.875%MS 15 DISCRETIONARY ORDER IF THIS CONFIRMAT purchase
+164
+3/2/2026
+Yes $500,001 - $1,000,000
+165
+BANK OF AMERICA CORPORATION - BAC
+3/18/2026
+purchase
+No $50,001 - $100,000
+COREBRIDGE FINL INC PERP -A 6.8750% 12/31/49
+166
+3/18/2026
+purchase
+No $50,001 - $100,000
+167
+WELLS FARGO & CO NEW - WFC
+3/18/2026
+No $50,001 - $100,000
+purchase
+168
+WELLS FARGO & CO NEW PERP 7.6250%
+3/18/2026
+purchase
+No $100,001 - $250,000
+169
+WELLS FARGO & CO PERP NT 6.8500% 12/31/49
+3/18/2026
+sale
+No $50,001 - $100,000
+WELLS FARGO & CO PERP A BB N 3.9000% 12/31/49
+170
+3/15/2026
+sale
+No $250,001 - $500,000
+171
+WELLS FARGO & CO PERP GG NT 6.1250% 12/31/49
+3/13/2026
+purchase
+No $15,001 - $50,000
+172
+WELLS FARGO & CO PERP GG NT 6.1250% 12/31/49
+3/13/2026
+purchase
+No $1,001 - $15,000
+WELLS FARGO & CO PERP GG NT 6.1250% 12/31/49
+173
+3/11/2026
+purchase
+No $100,001 - $250,000
+174
+BANK OF AMERICA CORPORATION - BAC
+3/4/2026
+purchase
+Yes $15,001 - $50,000
+WELLS FARGO & CO NEW - WFC
+175
+3/4/2026
+purchase
+Yes $15,001 - $50,000
+.
