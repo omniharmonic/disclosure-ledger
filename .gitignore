@@ -30,3 +30,6 @@ coverage/
 # local artifacts
 .playwright-mcp/
 *.jpeg
+
+# Local design source assets (large originals)
+design/

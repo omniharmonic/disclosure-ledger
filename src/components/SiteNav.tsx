@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -20,7 +21,14 @@ export function SiteNav() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="flex items-center justify-between gap-6 pt-3 pb-2 sm:pt-4">
           <Link href="/" className="group flex items-center gap-2.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-[var(--color-accent)] group-hover:animate-pulse" />
+            <Image
+              src="/logo-mark.png"
+              alt=""
+              width={600}
+              height={385}
+              priority
+              className="h-7 w-auto transition-opacity group-hover:opacity-80 sm:h-8"
+            />
             <span className="font-display text-base font-bold tracking-tight sm:text-lg">
               TRUMP&nbsp;STOCK&nbsp;TRACKER
             </span>
