@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 export type Stage =
   | "discover"
   | "fetch"
+  | "dedupe"
   | "parse"
   | "ingest-statements"
   | "ingest-actions"

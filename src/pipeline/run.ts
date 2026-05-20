@@ -16,6 +16,7 @@
 import { withRun } from "./lib/runlog";
 import { discover } from "./stages/discover";
 import { fetchFilings } from "./stages/fetch";
+import { dedupeFilings } from "./stages/dedupe";
 import { parseFilings } from "./stages/parse";
 import { enrichTransactions } from "./stages/enrich";
 import { ingestStatements } from "./stages/ingest-statements";
@@ -35,6 +36,12 @@ async function runDiscoverAndFetch(): Promise<void> {
              errors: result.errors };
   });
 }
+
+const runDedupe = () =>
+  withRun("dedupe", async () => {
+    const result = await dedupeFilings();
+    return { result, itemsFound: result.superseded };
+  });
 
 const runParse = () =>
   withRun("parse", async () => {
@@ -86,6 +93,9 @@ async function main(): Promise<void> {
     case "fetch":
       await runDiscoverAndFetch();
       break;
+    case "dedupe":
+      await runDedupe();
+      break;
     case "parse":
       await runParse();
       break;
@@ -109,6 +119,7 @@ async function main(): Promise<void> {
       break;
     case "all":
       await runDiscoverAndFetch();
+      await runDedupe();
       await runParse();
       await runStatements();
       await runActions();
