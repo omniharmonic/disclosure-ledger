@@ -23,3 +23,7 @@ data/cache/
 .vercel
 coverage/
 *.tsbuildinfo
+
+# local artifacts
+.playwright-mcp/
+*.jpeg
