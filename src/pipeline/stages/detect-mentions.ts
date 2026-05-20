@@ -88,6 +88,11 @@ const WEAK_SOLO_TOKENS = new Set([
   "chemicals", "automotive", "transport", "transportation", "logistics",
   "development", "management", "consulting", "diagnostics", "biotech",
   "exploration", "operating", "international", "associates", "holding",
+  // dictionary words and common surnames that are also single-token company
+  // names — review of real matches showed these produced only false hits.
+  "carrier", "monster", "lincoln", "jackson", "tyler", "baxter", "brinker",
+  "maine", "target", "strategy", "gateway", "paper", "express", "comfort",
+  "banner", "pathward", "douglas", "emmett", "warner", "cooper", "parker",
 ]);
 
 /**
@@ -125,10 +130,11 @@ async function buildGazetteer(): Promise<Gaz[]> {
 function findSpans(text: string, g: Gaz): { quote: string; start: number; end: number }[] {
   const hits: { quote: string; start: number; end: number }[] = [];
   const patterns: RegExp[] = [];
-  // Tickers are matched case-sensitively (uppercase) and only at length >= 3,
-  // to avoid two-letter symbols colliding with ordinary words.
-  if (g.ticker && g.ticker.length >= 3 && !TICKER_STOPWORDS.has(g.ticker.toUpperCase())) {
-    patterns.push(new RegExp(`\\b${g.ticker}\\b`, "g"));
+  // Tickers are matched ONLY as cashtags ("$AAPL"). Bare ticker symbols are
+  // overwhelmingly ordinary words (COST, FAST, TEAM, SNAP, TGT, ON, ALL …) and
+  // produced almost entirely false matches; a "$" prefix is unambiguous.
+  if (g.ticker && g.ticker.length >= 2 && !TICKER_STOPWORDS.has(g.ticker.toUpperCase())) {
+    patterns.push(new RegExp(`\\$${g.ticker}\\b`, "g"));
   }
   if (g.nameKey) {
     // Single token, or a two-word phrase with flexible whitespace.
