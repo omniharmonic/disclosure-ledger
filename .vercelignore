@@ -1,0 +1,8 @@
+data
+pipeline
+.playwright-mcp
+*.jpeg
+docs
+.git
+node_modules
+.next

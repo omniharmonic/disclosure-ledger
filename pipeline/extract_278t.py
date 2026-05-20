@@ -183,6 +183,17 @@ def parse_page(text, page_num, filing_year):
         ).strip(" .,-|:%@")
         if len(desc) < 3:
             continue
+        # Reject rows whose "description" is really page-header / form boilerplate
+        # that happened to sit near a date + amount.
+        if re.search(
+            r"OGE Form|Updated Februar|if you need more|public form|"
+            r"account numbers|Filer.?s Name|Page \d+ of|Transactions?$",
+            desc, re.I,
+        ):
+            continue
+        # Reject rows with no real alphabetic content (pure OCR digit noise).
+        if len(re.sub(r"[^A-Za-z]", "", desc)) < 4:
+            continue
         out.append({
             "sourcePage": page_num,
             "descriptionRaw": desc,

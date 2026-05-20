@@ -17,12 +17,16 @@ const globalForDb = globalThis as unknown as {
   __pg?: ReturnType<typeof postgres>;
 };
 
+const isLocal =
+  connectionString.includes("localhost") || connectionString.includes("127.0.0.1");
+
 const client =
   globalForDb.__pg ??
   postgres(connectionString, {
     max: 10,
     idle_timeout: 20,
     prepare: false, // safe with pooled (PgBouncer transaction-mode) connections
+    ssl: isLocal ? false : "require", // Neon (and any managed Postgres) requires TLS
   });
 
 if (process.env.NODE_ENV !== "production") globalForDb.__pg = client;
