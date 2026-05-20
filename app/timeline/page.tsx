@@ -8,20 +8,19 @@ export const dynamic = "force-dynamic";
 export default async function TimelinePage() {
   const events = await getTimelineEvents();
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Timeline</h1>
-        <p className="mt-1 max-w-2xl text-sm text-[var(--color-muted)]">
-          Trades, public statements, and official actions on parallel tracks. The sequence
-          around any trade — what was said and done before and after — is the heart of the
-          conflict-of-interest question.
+    <div className="space-y-6">
+      <header className="rise max-w-2xl">
+        <div className="kicker">Chronology</div>
+        <h1 className="mt-1 font-display text-4xl font-semibold tracking-tight">
+          The sequence of events
+        </h1>
+        <p className="mt-3 text-sm leading-relaxed text-[var(--color-ink-soft)]">
+          Trades, public statements, and official actions on parallel tracks. What was said and
+          done before and after a trade is the heart of the conflict-of-interest question —
+          scroll through time and click any marker to read it.
         </p>
-      </div>
+      </header>
       <TimelineView events={events} />
-      <p className="text-xs text-[var(--color-muted)]">
-        Showing the most recent events in each lane. Transaction dates may precede their filing
-        date by 30–45 days.
-      </p>
     </div>
   );
 }

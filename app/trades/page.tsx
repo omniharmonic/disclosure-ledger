@@ -41,13 +41,16 @@ export default async function TradesPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Disclosed Trades</h1>
-        <p className="mt-1 text-sm text-[var(--color-muted)]">
+      <header className="rise">
+        <div className="kicker">Transaction register</div>
+        <h1 className="mt-1 font-display text-4xl font-semibold tracking-tight">
+          Disclosed trades
+        </h1>
+        <p className="mt-2 text-sm text-[var(--color-ink-soft)]">
           {total.toLocaleString()} transaction{total === 1 ? "" : "s"} from publicly-released
           OGE Form 278-T filings. Amounts are statutory ranges, not exact figures.
         </p>
-      </div>
+      </header>
 
       <TradeFilters />
 

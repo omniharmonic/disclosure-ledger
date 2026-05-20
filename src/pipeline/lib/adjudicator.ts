@@ -126,6 +126,20 @@ export async function adjudicate(
     const toolUse = response.content.find((b) => b.type === "tool_use");
     if (!toolUse || toolUse.type !== "tool_use") return null;
     const rows = (toolUse.input as { rows: LlmRow[] }).rows;
+
+    // Truncation guard: a response that hit the token ceiling returns far
+    // fewer rows than the page actually holds. Never replace a fuller
+    // heuristic extraction with a truncated LLM one.
+    if (
+      response.stop_reason === "max_tokens" ||
+      rows.length < heuristic.rows.length * 0.85
+    ) {
+      console.log(
+        `[adjudicate] discarded — LLM returned ${rows.length} rows vs heuristic ` +
+          `${heuristic.rows.length} (likely truncated); keeping heuristic`,
+      );
+      return null;
+    }
     const output = toLlmOutput(heuristic, rows);
 
     // Trust the LLM extraction: it read the form directly under a strict

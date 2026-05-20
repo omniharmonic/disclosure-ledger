@@ -1,28 +1,87 @@
 @import "tailwindcss";
 
+/*
+ * Disclosure Ledger — visual identity.
+ * An investigative-dossier aesthetic: warm archival paper, oxblood accent,
+ * a high-contrast editorial serif (Fraunces) over a clean grotesque body,
+ * monospace for every figure — numbers read as evidence.
+ */
 @theme {
-  --color-ink: #14110e;
-  --color-paper: #faf8f4;
-  --color-rule: #e2ddd3;
+  --color-paper: #f4f1e8;
+  --color-paper-2: #eae3d4;
+  --color-card: #fbfaf5;
+  --color-ink: #1a1714;
+  --color-ink-soft: #4b443b;
+  --color-muted: #8a8073;
+  --color-rule: #d8d0bd;
+  --color-rule-soft: #e6dfce;
   --color-accent: #8a1a1a;
+  --color-accent-deep: #5e0f0f;
   --color-buy: #1f6f43;
   --color-sell: #a32020;
-  --color-muted: #6b6459;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --color-flag: #9a6b00;
+
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-sans: var(--font-spline), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, Menlo, monospace;
 }
 
 html,
 body {
-  background: var(--color-paper);
+  background-color: var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* faint archival grid, like ledger paper */
+body {
+  background-image:
+    linear-gradient(var(--color-rule-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-rule-soft) 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: -1px -1px;
 }
 
 a {
   color: inherit;
 }
 
+.font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+}
+
 .tabular {
   font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+}
+
+/* one-shot staggered reveal on page load */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise {
+  animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* hairline label, used for eyebrows / section kickers */
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-paper);
 }

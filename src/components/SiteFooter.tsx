@@ -1,21 +1,30 @@
+import Link from "next/link";
+
 export function SiteFooter() {
   return (
-    <footer className="mt-24 border-t border-[var(--color-rule)] bg-[var(--color-paper)]">
-      <div className="mx-auto max-w-7xl px-6 py-10 text-xs leading-relaxed text-[var(--color-muted)]">
-        <p className="max-w-3xl">
-          <strong className="text-[var(--color-ink)]">Disclosure Ledger</strong> is a
-          civic-transparency project. It compiles public records: securities transactions
-          disclosed under the Ethics in Government Act and the STOCK Act, the President&rsquo;s
-          public statements, and official government actions. Disclosed amounts are statutory
-          ranges, not exact figures. Timing correlations are presented as facts and
-          transparently-scored signals — <em>not</em> as findings of illegality. No evidence
-          presented here establishes that any trade used nonpublic information; correlation is
-          not causation; lawful trading is lawful.
+    <footer className="mt-28 border-t-2 border-[var(--color-ink)] bg-[var(--color-paper-2)]">
+      <div className="mx-auto max-w-7xl px-6 py-12">
+        <div className="kicker">Standing disclaimer</div>
+        <p className="mt-3 max-w-3xl font-display text-lg leading-snug">
+          This is a transparency record, not an accusation. It compiles public facts —
+          disclosed transactions, public statements, official actions — and scores their
+          timing. No evidence presented here establishes that any trade used nonpublic
+          information. Correlation is not causation. Lawful trading is lawful.
         </p>
-        <p className="mt-4">
-          Project by Benjamin Life (@omniharmonic) · OpenCivics. Data used solely for news and
-          transparency dissemination to the general public.
-        </p>
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--color-rule)] pt-5 text-xs text-[var(--color-muted)]">
+          <span>
+            Project by Benjamin Life (@omniharmonic) · OpenCivics. Disclosed amounts are
+            statutory ranges, not exact figures.
+          </span>
+          <span className="flex gap-4">
+            <Link href="/methodology" className="hover:text-[var(--color-ink)]">
+              Methodology
+            </Link>
+            <Link href="/api-docs" className="hover:text-[var(--color-ink)]">
+              API
+            </Link>
+          </span>
+        </div>
       </div>
     </footer>
   );

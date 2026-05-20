@@ -4,6 +4,12 @@ name: ingestion-pipeline
 # Vercel: a public repo gets unlimited free CI minutes, full Linux VMs (so
 # Tesseract / pdfplumber "just work"), and no function-duration ceiling.
 
+# Cadence: one daily run. Discovery is a cheap, idempotent HTTP poll, and the
+# parse stage only processes filings not seen before — so a daily run catches
+# new 278-T trade filings within a day of posting (they need only appear once;
+# late filings beyond the 45-day window are caught whenever they post) AND
+# pulls each day's new statements. A single daily job is simpler and more
+# reliable than separate trade/statement cadences.
 on:
   schedule:
     - cron: "0 9 * * *" # 09:00 UTC daily

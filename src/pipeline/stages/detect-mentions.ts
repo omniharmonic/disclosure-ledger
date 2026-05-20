@@ -55,23 +55,34 @@ interface Gaz {
   displayName: string;
 }
 
-const STATE_WORDS = new Set([
-  "state", "states", "senate", "house", "county", "city", "district", "school",
+/**
+ * Single tokens too generic to identify a company on their own. A one-word
+ * match key must be outside this set; multi-word names are matched as a phrase
+ * regardless, so "State Street" -> "state street" cannot hit "State Senate".
+ */
+const WEAK_SOLO_TOKENS = new Set([
+  "state", "states", "street", "world", "people", "value", "trust", "point",
+  "river", "creek", "ridge", "field", "stone", "white", "black", "green",
+  "north", "south", "prime", "union", "grand", "royal", "crown", "eagle",
+  "liberty", "summit", "vista", "metro", "civic", "public", "patriot",
 ]);
 
 /**
  * Build a precise match key from a company name. Generic business words are
- * stripped; a single remaining distinctive word (>= 5 chars) is matched alone;
- * two or more remaining words must match as an adjacent phrase.
+ * stripped; a single remaining distinctive word (>= 5 chars, not a weak solo
+ * token) is matched alone; two or more remaining words must match as an
+ * adjacent phrase.
  */
 function companyMatchKey(name: string): string | null {
   const words = name
     .toLowerCase()
     .replace(/[^a-z0-9 ]/g, " ")
     .split(/\s+/)
-    .filter((w) => w.length >= 4 && !GENERIC_NAME_WORDS.has(w) && !STATE_WORDS.has(w));
+    .filter((w) => w.length >= 4 && !GENERIC_NAME_WORDS.has(w));
   if (words.length === 0) return null;
-  if (words.length === 1) return words[0].length >= 5 ? words[0] : null;
+  if (words.length === 1) {
+    return words[0].length >= 5 && !WEAK_SOLO_TOKENS.has(words[0]) ? words[0] : null;
+  }
   return `${words[0]} ${words[1]}`;
 }
 
