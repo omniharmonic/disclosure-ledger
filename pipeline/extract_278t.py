@@ -22,6 +22,7 @@ The extractor never writes to the database — it emits JSON on stdout; the Node
 
 Usage:  python3 extract_278t.py <pdf_path> [filing_iso_date]
 """
+import difflib
 import json
 import re
 import sys
@@ -89,6 +90,34 @@ def classify_type(text):
         if any(k in low for k in kws):
             return canonical
     return None
+
+
+# The Type column holds exactly one of four values. OCR garbles the word
+# ("salo", "solo", "ourchaso") but it remains the token immediately before the
+# transaction date, so a fuzzy edit-distance match against the four canonical
+# words recovers most rows the keyword pass misses.
+_CANON_TYPE = {
+    "purchase": "Purchase",
+    "sale": "Sale",
+    "exchange": "Exchange",
+    "partial": "Sale (Partial)",
+}
+
+
+def fuzzy_type(head):
+    """Fuzzy-match the last word-token of `head` (the Type cell) to a type."""
+    toks = re.findall(r"[A-Za-z][A-Za-z]{2,}", head)
+    if not toks:
+        return None
+    best, best_ratio = None, 0.0
+    # The last two tokens cover an OCR split of the type word.
+    for tok in toks[-2:]:
+        t = tok.lower()
+        for key, canonical in _CANON_TYPE.items():
+            r = difflib.SequenceMatcher(None, t, key).ratio()
+            if r > best_ratio:
+                best_ratio, best = r, canonical
+    return best if best_ratio >= 0.5 else None
 
 
 def normalize_date(m):
@@ -169,7 +198,7 @@ def parse_page(text, page_num, filing_year):
         head = span[: date_m.start()]
         tail = span[date_m.end():]
 
-        ttype = classify_type(span) or "Unknown"
+        ttype = classify_type(span) or fuzzy_type(head) or "Unknown"
         notif = bool(re.search(r"\by[e3]s\b", tail, re.I))
 
         desc = strip_type_words(head)

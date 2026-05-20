@@ -75,6 +75,19 @@ const WEAK_SOLO_TOKENS = new Set([
   "vision", "pioneer", "century", "standard", "republic", "independence",
   "select", "premium", "advance", "advanced", "enterprise", "service",
   "country", "border", "energy", "power", "digital", "global", "national",
+  // industry / business common nouns — a lone one of these identifies no
+  // specific company ("Lam Research" must not match "research and engineering").
+  "research", "technologies", "technology", "industries", "industrial",
+  "defense", "engineering", "motors", "financial", "partners", "ventures",
+  "brands", "foods", "restaurant", "restaurants", "software", "semiconductor",
+  "pharmaceutical", "pharmaceuticals", "biosciences", "therapeutics",
+  "networks", "communications", "entertainment", "resources", "minerals",
+  "petroleum", "airlines", "airways", "hotels", "properties", "realty",
+  "insurance", "securities", "payments", "solutions", "services", "products",
+  "systems", "devices", "instruments", "laboratories", "materials",
+  "chemicals", "automotive", "transport", "transportation", "logistics",
+  "development", "management", "consulting", "diagnostics", "biotech",
+  "exploration", "operating", "international", "associates", "holding",
 ]);
 
 /**

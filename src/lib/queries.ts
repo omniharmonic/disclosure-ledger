@@ -390,6 +390,10 @@ export interface GraphNode {
   type: string;
   label: string;
   val: number;
+  /** Fuller text shown when the node is inspected. */
+  detail?: string;
+  /** A short secondary line — date, sector, source. */
+  sub?: string;
 }
 export interface GraphLink {
   source: string;
@@ -407,33 +411,56 @@ export async function getGraph(): Promise<{ nodes: GraphNode[]; links: GraphLink
     (ids[e.dstType] ??= new Set()).add(e.dstId);
   }
   const labels = new Map<string, string>();
+  const details = new Map<string, string>();
+  const subs = new Map<string, string>();
   const key = (t: string, id: string) => `${t}:${id}`;
 
   if (ids.person?.size) {
-    for (const p of await db.select().from(persons)) labels.set(key("person", p.id), p.fullName);
+    for (const p of await db.select().from(persons)) {
+      labels.set(key("person", p.id), p.fullName);
+      subs.set(key("person", p.id), p.role);
+    }
   }
   if (ids.company?.size) {
-    for (const c of await db.select().from(companies))
+    for (const c of await db.select().from(companies)) {
       labels.set(key("company", c.id), c.ticker ?? c.name);
+      details.set(key("company", c.id), c.oneLiner ?? c.name);
+      subs.set(key("company", c.id), [c.sector, c.industry].filter(Boolean).join(" · "));
+    }
   }
   if (ids.filing?.size) {
-    for (const f of await db.select().from(filings))
+    for (const f of await db.select().from(filings)) {
       labels.set(key("filing", f.id), `${f.formType} ${f.filingDate}`);
+      subs.set(key("filing", f.id), `filed ${f.filingDate}`);
+    }
   }
   if (ids.statement?.size) {
-    for (const s of await db.select().from(statements))
-      labels.set(key("statement", s.id), s.fullText.slice(0, 50));
+    for (const s of await db.select().from(statements)) {
+      labels.set(key("statement", s.id), s.fullText.slice(0, 44));
+      details.set(key("statement", s.id), s.fullText.slice(0, 360));
+      subs.set(key("statement", s.id), `${s.channel ?? "statement"} · ${s.spokenAt}`);
+    }
   }
   if (ids.action?.size) {
-    for (const a of await db.select().from(actions))
-      labels.set(key("action", a.id), a.title.slice(0, 60));
+    for (const a of await db.select().from(actions)) {
+      labels.set(key("action", a.id), a.title.slice(0, 52));
+      details.set(key("action", a.id), a.title);
+      subs.set(key("action", a.id), `${a.actionType.replace(/_/g, " ")} · ${a.occurredOn}`);
+    }
   }
 
   const nodeMap = new Map<string, GraphNode>();
   const ensure = (type: string, id: string) => {
     const k = key(type, id);
     if (!nodeMap.has(k))
-      nodeMap.set(k, { id: k, type, label: labels.get(k) ?? type, val: 1 });
+      nodeMap.set(k, {
+        id: k,
+        type,
+        label: labels.get(k) ?? type,
+        val: 1,
+        detail: details.get(k),
+        sub: subs.get(k),
+      });
     else nodeMap.get(k)!.val += 1;
   };
   const links: GraphLink[] = edges.map((e) => {
