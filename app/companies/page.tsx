@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { listCompanies } from "@/lib/queries";
+import { CompaniesTable } from "@/components/CompaniesTable";
 
 export const metadata: Metadata = { title: "Companies" };
 export const dynamic = "force-dynamic";
@@ -58,49 +59,8 @@ export default async function CompaniesPage() {
       )}
 
       <section>
-        <div className="kicker mb-3">All companies · {companies.length}</div>
-        <div className="overflow-x-auto rounded-lg border border-[var(--color-rule)]">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-[var(--color-rule)] bg-[var(--color-card)] text-left text-[0.7rem] uppercase tracking-wide text-[var(--color-muted)]">
-                <th className="px-3 py-2 font-medium">Ticker</th>
-                <th className="px-3 py-2 font-medium">Company</th>
-                <th className="px-3 py-2 font-medium">Sector</th>
-                <th className="px-3 py-2 text-right font-medium">Trades</th>
-                <th className="px-3 py-2 text-right font-medium">Correlations</th>
-              </tr>
-            </thead>
-            <tbody>
-              {companies.map((c) => (
-                <tr
-                  key={c.id}
-                  className="border-b border-[var(--color-rule-soft)] last:border-0 hover:bg-[var(--color-card)]"
-                >
-                  <td className="px-3 py-2">
-                    <Link
-                      href={`/companies/${encodeURIComponent(c.ticker ?? c.name)}`}
-                      className="font-mono font-semibold hover:text-[var(--color-accent)]"
-                    >
-                      {c.ticker ?? "—"}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2 text-[var(--color-ink-soft)]">{c.name}</td>
-                  <td className="px-3 py-2 text-[var(--color-muted)]">{c.sector ?? "—"}</td>
-                  <td className="px-3 py-2 text-right tabular">{c.tradeCount}</td>
-                  <td className="px-3 py-2 text-right tabular">
-                    {c.correlationCount > 0 ? (
-                      <span className="font-semibold text-[var(--color-accent)]">
-                        {c.correlationCount}
-                      </span>
-                    ) : (
-                      <span className="text-[var(--color-muted)]">0</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <div className="kicker mb-3">All companies · {companies.length} · click a row</div>
+        <CompaniesTable companies={companies} />
       </section>
     </div>
   );

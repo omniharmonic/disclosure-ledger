@@ -18,15 +18,15 @@ export function SiteNav() {
   return (
     <header className="sticky top-0 z-50 border-b border-[var(--color-rule)] bg-[var(--color-paper)]/95 backdrop-blur">
       <div className="mx-auto max-w-7xl px-6">
-        <div className="flex items-end justify-between gap-6 pt-5 pb-2">
-          <Link href="/" className="group">
-            <div className="kicker mb-0.5">Civic Accountability Record</div>
-            <div className="font-display text-2xl font-semibold leading-none tracking-tight">
-              Disclosure&nbsp;Ledger
-            </div>
+        <div className="flex items-center justify-between gap-6 pt-4 pb-2">
+          <Link href="/" className="group flex items-center gap-2.5">
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-[var(--color-accent)] group-hover:animate-pulse" />
+            <span className="font-display text-lg font-bold tracking-tight">
+              TRUMP&nbsp;STOCK&nbsp;TRACKER
+            </span>
           </Link>
-          <span className="hidden text-right text-[0.7rem] leading-tight text-[var(--color-muted)] sm:block">
-            Presidential trades · statements · official actions
+          <span className="hidden font-mono text-[0.65rem] text-[var(--color-muted)] sm:block">
+            disclosed trades · statements · official actions
           </span>
         </div>
         <nav className="flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-[var(--color-rule-soft)] py-2">
@@ -36,16 +36,14 @@ export function SiteNav() {
               <Link
                 key={l.href}
                 href={l.href}
-                className={`text-[0.8rem] font-medium tracking-wide transition-colors ${
+                className={`font-mono text-[0.78rem] tracking-tight transition-colors ${
                   active
                     ? "text-[var(--color-accent)]"
                     : "text-[var(--color-ink-soft)] hover:text-[var(--color-ink)]"
                 }`}
               >
+                {active ? "▸ " : ""}
                 {l.label}
-                {active && (
-                  <span className="ml-1.5 inline-block h-1 w-1 rounded-full bg-[var(--color-accent)] align-middle" />
-                )}
               </Link>
             );
           })}

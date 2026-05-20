@@ -116,13 +116,31 @@ export function TimelineView({ events }: { events: TimelineEvent[] }) {
         </div>
       </div>
 
-      <div className="min-h-[5rem] rounded-lg border border-[var(--color-rule)] bg-[var(--color-card)] p-4">
+      <div className="min-h-[6rem] rounded-lg border border-[var(--color-rule)] bg-[var(--color-card)] p-4">
         {pinned ? (
           <div>
-            <div className="kicker">
-              {pinned.kind} · {formatDate(pinned.date)}
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className="rounded px-1.5 py-0.5 font-mono text-[0.6rem] uppercase tracking-wide text-white"
+                style={{
+                  background:
+                    LANES.find((l) => l.kind === pinned.kind)?.color ?? "var(--color-muted)",
+                }}
+              >
+                {pinned.kind}
+              </span>
+              <span className="kicker">{formatDate(pinned.date)}</span>
+              {pinned.tags.map((tag) => (
+                <Link
+                  key={tag}
+                  href={`/companies/${encodeURIComponent(tag)}`}
+                  className="rounded border border-[var(--color-rule)] px-1.5 py-0.5 font-mono text-[0.65rem] hover:border-[var(--color-accent)]"
+                >
+                  ${tag}
+                </Link>
+              ))}
             </div>
-            <p className="mt-1 font-display text-lg leading-snug">{pinned.detail}</p>
+            <p className="mt-2 font-display text-base leading-snug">{pinned.detail}</p>
             <div className="mt-2 text-xs">
               {pinned.internal ? (
                 <Link href={pinned.href} className="font-medium text-[var(--color-accent)] hover:underline">
@@ -135,11 +153,42 @@ export function TimelineView({ events }: { events: TimelineEvent[] }) {
                 </a>
               )}
             </div>
+            {pinned.related.length > 0 && (
+              <div className="mt-3 border-t border-[var(--color-rule-soft)] pt-2">
+                <div className="kicker mb-1.5">
+                  Correlated with · {pinned.related.length}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {pinned.related.map((r, i) => (
+                    <Link
+                      key={i}
+                      href={r.href}
+                      className="flex items-center gap-1.5 rounded border border-[var(--color-rule-soft)] px-2 py-1 text-[0.7rem] hover:border-[var(--color-accent)]"
+                    >
+                      <span
+                        className="font-mono font-bold"
+                        style={{
+                          color:
+                            r.signal >= 60
+                              ? "var(--color-accent)"
+                              : r.signal >= 40
+                                ? "var(--color-flag)"
+                                : "var(--color-muted)",
+                        }}
+                      >
+                        {r.signal.toFixed(0)}
+                      </span>
+                      <span className="max-w-[18rem] truncate">{r.label}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <p className="text-sm text-[var(--color-muted)]">
-            Click any marker to read it. Scroll the timeline horizontally to move through time —
-            {shown.length} events shown across the trade-disclosure window.
+            Click any marker to read it and see what it&rsquo;s correlated with. Scroll the
+            timeline horizontally to move through time — {shown.length} events shown.
           </p>
         )}
       </div>

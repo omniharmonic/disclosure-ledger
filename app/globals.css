@@ -1,27 +1,29 @@
 @import "tailwindcss";
 
 /*
- * Disclosure Ledger — visual identity.
- * An investigative-dossier aesthetic: warm archival paper, oxblood accent,
- * a high-contrast editorial serif (Fraunces) over a clean grotesque body,
- * monospace for every figure — numbers read as evidence.
+ * Trump Stock Tracker — visual identity.
+ * A surveillance-terminal aesthetic: warm archival paper kept (legible,
+ * trustworthy) but the type goes technical — a retro monospace (Space Mono)
+ * for headlines, a clean sans for body, a second monospace for every figure.
+ * Numbers read as instrument readouts; headlines read as a tracking console.
  */
 @theme {
-  --color-paper: #f4f1e8;
-  --color-paper-2: #eae3d4;
+  --color-paper: #f2efe6;
+  --color-paper-2: #e7e0d0;
   --color-card: #fbfaf5;
-  --color-ink: #1a1714;
-  --color-ink-soft: #4b443b;
-  --color-muted: #8a8073;
-  --color-rule: #d8d0bd;
-  --color-rule-soft: #e6dfce;
-  --color-accent: #8a1a1a;
+  --color-ink: #16140f;
+  --color-ink-soft: #463f36;
+  --color-muted: #857b6d;
+  --color-rule: #d3cab6;
+  --color-rule-soft: #e3dccb;
+  --color-accent: #9c1f1f;
   --color-accent-deep: #5e0f0f;
-  --color-buy: #1f6f43;
-  --color-sell: #a32020;
-  --color-flag: #9a6b00;
+  --color-signal: #146b5c;
+  --color-buy: #146b5c;
+  --color-sell: #9c1f1f;
+  --color-flag: #8a6400;
 
-  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-display: var(--font-space-mono), ui-monospace, Menlo, monospace;
   --font-sans: var(--font-spline), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, Menlo, monospace;
 }
@@ -49,7 +51,7 @@ a {
 
 .font-display {
   font-family: var(--font-display);
-  font-optical-sizing: auto;
+  letter-spacing: -0.03em;
 }
 
 .tabular {

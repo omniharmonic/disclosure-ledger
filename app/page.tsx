@@ -33,8 +33,9 @@ export default async function HomePage() {
     <div className="space-y-14">
       <section className="rise max-w-4xl">
         <div className="kicker">Office of Government Ethics · Form 278-T</div>
-        <h1 className="mt-2 font-display text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
-          A public record of presidential trading — and everything around it.
+        <h1 className="mt-3 font-display text-3xl font-bold leading-[1.15] tracking-tight sm:text-[2.6rem]">
+          A public record of presidential trading
+          <span className="text-[var(--color-accent)]"> — and everything around it.</span>
         </h1>
         <p className="mt-5 max-w-2xl text-base leading-relaxed text-[var(--color-ink-soft)]">
           This platform turns the President&rsquo;s securities-disclosure filings into rigorous

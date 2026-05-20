@@ -7,7 +7,7 @@
  */
 const USER_AGENT =
   process.env.CRAWLER_USER_AGENT ??
-  "disclosure-ledger civic-transparency project (contact: benjamin@opencivics.co)";
+  "trump-stock-tracker civic-transparency project (contact: benjamin@opencivics.co)";
 
 /** Minimum milliseconds between requests to the same host. */
 const HOST_MIN_INTERVAL_MS = 2_000;
@@ -29,11 +29,13 @@ export interface FetchOptions {
   retries?: number;
   timeoutMs?: number;
   accept?: string;
+  /** Override the User-Agent (e.g. APIs that reject non-browser agents). */
+  userAgent?: string;
 }
 
 /** Fetch with throttling, retries, and a descriptive User-Agent. */
 export async function politeFetch(url: string, opts: FetchOptions = {}): Promise<Response> {
-  const { retries = 3, timeoutMs = 60_000, accept } = opts;
+  const { retries = 3, timeoutMs = 60_000, accept, userAgent } = opts;
   let lastErr: unknown;
   for (let attempt = 0; attempt <= retries; attempt++) {
     await throttle(url);
@@ -42,7 +44,7 @@ export async function politeFetch(url: string, opts: FetchOptions = {}): Promise
       const timer = setTimeout(() => ctrl.abort(), timeoutMs);
       const res = await fetch(url, {
         headers: {
-          "User-Agent": USER_AGENT,
+          "User-Agent": userAgent ?? USER_AGENT,
           ...(accept ? { Accept: accept } : {}),
         },
         signal: ctrl.signal,

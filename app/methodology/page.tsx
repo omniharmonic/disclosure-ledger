@@ -4,7 +4,7 @@ import { AMOUNT_BANDS } from "@/lib/bands";
 export const metadata: Metadata = {
   title: "Methodology",
   description:
-    "How Disclosure Ledger sources, extracts, validates, and presents presidential financial-disclosure data.",
+    "How Trump Stock Tracker sources, extracts, validates, and presents presidential financial-disclosure data.",
 };
 
 function H({ children }: { children: React.ReactNode }) {
@@ -23,7 +23,7 @@ export default function MethodologyPage() {
 
       <H>What this is</H>
       <p>
-        Disclosure Ledger is a civic-transparency project. It compiles the President&rsquo;s
+        Trump Stock Tracker is a civic-transparency project. It compiles the President&rsquo;s
         securities transactions as disclosed under the <strong>Ethics in Government Act of
         1978</strong> and the <strong>STOCK Act of 2012</strong>, and correlates them with his
         public statements and official government actions. It is a transparency tool — not
@@ -76,7 +76,12 @@ export default function MethodologyPage() {
         </li>
         <li>
           <strong>Official actions:</strong> the Federal Register API (executive orders,
-          proclamations, rules) and USAspending.gov (federal contract awards).
+          proclamations, rules) and White House fact sheets, articles, and statements scraped
+          from whitehouse.gov.
+        </li>
+        <li>
+          <strong>Share prices:</strong> end-of-day price history from Stooq, used to chart
+          each company and mark the President&rsquo;s disclosed trades on the timeline.
         </li>
       </ul>
 
@@ -121,7 +126,7 @@ export default function MethodologyPage() {
       </p>
 
       <H>Attribution</H>
-      <p>Project by Benjamin Life (@omniharmonic) · OpenCivics. Methodology version 1.0.</p>
+      <p>Project by Benjamin Life (@omniharmonic). Methodology version 1.1.</p>
     </article>
   );
 }

@@ -17,6 +17,7 @@ import {
   correlations,
   graphEdges,
   persons,
+  priceCache,
 } from "@/db/schema";
 import { and, or, eq, gte, lte, ilike, desc, asc, sql, inArray, count } from "drizzle-orm";
 
@@ -215,7 +216,13 @@ export async function listCompanies(): Promise<CompanyListItem[]> {
     .from(companies)
     .innerJoin(transactions, eq(transactions.companyId, companies.id))
     .innerJoin(filings, eq(transactions.filingId, filings.id))
-    .leftJoin(correlations, eq(correlations.transactionId, transactions.id))
+    .leftJoin(
+      correlations,
+      and(
+        eq(correlations.transactionId, transactions.id),
+        sql`${correlations.verifiedGenuine} is not false`,
+      ),
+    )
     .where(inArray(filings.status, [...PUBLIC_FILING_STATUSES]))
     .groupBy(companies.id)
     .orderBy(
@@ -249,6 +256,9 @@ export async function getCompany(ticker: string) {
       amountBand: transactions.amountBand,
       amountMin: transactions.amountMin,
       amountMax: transactions.amountMax,
+      priceAtTxn: transactions.priceAtTxn,
+      priceCurrent: transactions.priceCurrent,
+      gainLossPct: transactions.gainLossPct,
       filingId: transactions.filingId,
       filingDate: filings.filingDate,
       sourceUrl: filings.sourceUrl,
@@ -262,6 +272,12 @@ export async function getCompany(ticker: string) {
       ),
     )
     .orderBy(desc(transactions.transactionDate));
+
+  const prices = await db
+    .select({ date: priceCache.priceDate, close: priceCache.closePrice })
+    .from(priceCache)
+    .where(eq(priceCache.ticker, company.ticker ?? "—"))
+    .orderBy(asc(priceCache.priceDate));
 
   const corr = await db
     .select({
@@ -284,12 +300,18 @@ export async function getCompany(ticker: string) {
     .innerJoin(transactions, eq(correlations.transactionId, transactions.id))
     .leftJoin(statements, eq(correlations.statementId, statements.id))
     .leftJoin(actions, eq(correlations.actionId, actions.id))
-    .where(eq(transactions.companyId, company.id))
+    .where(
+      and(
+        eq(transactions.companyId, company.id),
+        sql`${correlations.verifiedGenuine} is not false`,
+      ),
+    )
     .orderBy(desc(correlations.signalScore));
 
   return {
     company,
     transactions: txns,
+    prices,
     correlations: corr.map((r) => ({
       id: r.id,
       transactionId: r.transactionId,
@@ -339,7 +361,13 @@ export async function getCorrelations(transactionId: string): Promise<Correlatio
     .from(correlations)
     .leftJoin(statements, eq(correlations.statementId, statements.id))
     .leftJoin(actions, eq(correlations.actionId, actions.id))
-    .where(eq(correlations.transactionId, transactionId))
+    .where(
+      and(
+        eq(correlations.transactionId, transactionId),
+        // hide correlations the reasoning stage flagged as string coincidences
+        sql`${correlations.verifiedGenuine} is not false`,
+      ),
+    )
     .orderBy(desc(correlations.signalScore));
 
   return rows.map((r) => ({
@@ -429,6 +457,10 @@ export interface TimelineEvent {
   detail: string;
   href: string;
   internal: boolean;
+  /** Company tickers tied to this event (via the trade or its correlations). */
+  tags: string[];
+  /** What this event is correlated to, highest signal first. */
+  related: { label: string; signal: number; href: string }[];
 }
 
 /**
@@ -470,6 +502,61 @@ export async function getTimelineEvents(limit = 600): Promise<TimelineEvent[]> {
     .orderBy(desc(actions.occurredOn))
     .limit(limit);
 
+  // Correlation links, so each event card can show what it connects to.
+  const corrRows = await db
+    .select({
+      transactionId: correlations.transactionId,
+      statementId: correlations.statementId,
+      actionId: correlations.actionId,
+      eventKind: correlations.eventKind,
+      signal: correlations.signalScore,
+      ticker: companies.ticker,
+      txnId: transactions.id,
+      txnType: transactions.transactionType,
+      statementText: statements.fullText,
+      actionTitle: actions.title,
+    })
+    .from(correlations)
+    .innerJoin(transactions, eq(correlations.transactionId, transactions.id))
+    .leftJoin(companies, eq(transactions.companyId, companies.id))
+    .leftJoin(statements, eq(correlations.statementId, statements.id))
+    .leftJoin(actions, eq(correlations.actionId, actions.id))
+    .where(sql`${correlations.verifiedGenuine} is not false`);
+
+  type Rel = { label: string; signal: number; href: string };
+  const byTrade = new Map<string, Rel[]>();
+  const byEvent = new Map<string, Rel[]>();
+  const tagsByTrade = new Map<string, Set<string>>();
+  const tagsByEvent = new Map<string, Set<string>>();
+
+  for (const r of corrRows) {
+    const eventId = r.eventKind === "statement" ? r.statementId : r.actionId;
+    if (!eventId) continue;
+    const eventLabel =
+      r.eventKind === "statement"
+        ? `“${(r.statementText ?? "").slice(0, 60)}…”`
+        : (r.actionTitle ?? "official action");
+    // trade -> its events
+    (byTrade.get(r.transactionId) ?? byTrade.set(r.transactionId, []).get(r.transactionId)!).push({
+      label: eventLabel,
+      signal: r.signal,
+      href: `/trades/${r.transactionId}`,
+    });
+    // event -> its trades
+    (byEvent.get(eventId) ?? byEvent.set(eventId, []).get(eventId)!).push({
+      label: `${r.ticker ?? "?"} ${r.txnType}`,
+      signal: r.signal,
+      href: `/trades/${r.txnId}`,
+    });
+    if (r.ticker) {
+      (tagsByTrade.get(r.transactionId) ?? tagsByTrade.set(r.transactionId, new Set()).get(r.transactionId)!).add(r.ticker);
+      (tagsByEvent.get(eventId) ?? tagsByEvent.set(eventId, new Set()).get(eventId)!).add(r.ticker);
+    }
+  }
+
+  const topRel = (rs: Rel[] | undefined): Rel[] =>
+    (rs ?? []).sort((a, b) => b.signal - a.signal).slice(0, 8);
+
   return [
     ...trades.map((t) => ({
       id: t.id,
@@ -479,6 +566,8 @@ export async function getTimelineEvents(limit = 600): Promise<TimelineEvent[]> {
       detail: t.desc,
       href: `/trades/${t.id}`,
       internal: true,
+      tags: t.ticker ? [t.ticker] : [],
+      related: topRel(byTrade.get(t.id)),
     })),
     ...stmts.map((s) => ({
       id: s.id,
@@ -488,6 +577,8 @@ export async function getTimelineEvents(limit = 600): Promise<TimelineEvent[]> {
       detail: s.text.slice(0, 400),
       href: s.url,
       internal: false,
+      tags: [...(tagsByEvent.get(s.id) ?? [])],
+      related: topRel(byEvent.get(s.id)),
     })),
     ...acts.map((a) => ({
       id: a.id,
@@ -497,6 +588,8 @@ export async function getTimelineEvents(limit = 600): Promise<TimelineEvent[]> {
       detail: a.title,
       href: a.url,
       internal: false,
+      tags: [...(tagsByEvent.get(a.id) ?? [])],
+      related: topRel(byEvent.get(a.id)),
     })),
   ];
 }

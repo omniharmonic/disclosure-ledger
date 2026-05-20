@@ -19,10 +19,13 @@ import { fetchFilings } from "./stages/fetch";
 import { dedupeFilings } from "./stages/dedupe";
 import { parseFilings } from "./stages/parse";
 import { enrichTransactions } from "./stages/enrich";
+import { ingestPrices } from "./stages/ingest-prices";
 import { ingestStatements } from "./stages/ingest-statements";
 import { ingestActions } from "./stages/ingest-actions";
+import { ingestWhiteHouse } from "./stages/ingest-whitehouse";
 import { detectMentions } from "./stages/detect-mentions";
 import { correlate } from "./stages/correlate";
+import { verifyCorrelations } from "./stages/verify-correlations";
 import { buildGraph } from "./stages/graph-build";
 
 async function runDiscoverAndFetch(): Promise<void> {
@@ -58,14 +61,25 @@ const runStatements = () =>
 
 const runActions = () =>
   withRun("ingest-actions", async () => {
-    const result = await ingestActions();
-    return { result, itemsFound: result.ingested, errors: result.errors };
+    const fr = await ingestActions();
+    const wh = await ingestWhiteHouse();
+    return {
+      result: { fr, wh },
+      itemsFound: fr.ingested + wh.ingested,
+      errors: [...fr.errors, ...wh.errors],
+    };
   });
 
 const runEnrich = () =>
   withRun("enrich", async () => {
     const result = await enrichTransactions();
     return { result, itemsFound: result.resolved };
+  });
+
+const runPrices = () =>
+  withRun("ingest-prices", async () => {
+    const result = await ingestPrices();
+    return { result, itemsFound: result.pricePoints, errors: result.errors };
   });
 
 const runMentions = () =>
@@ -78,6 +92,12 @@ const runCorrelate = () =>
   withRun("correlate", async () => {
     const result = await correlate();
     return { result, itemsFound: result.pairs };
+  });
+
+const runVerify = () =>
+  withRun("verify-correlations", async () => {
+    const result = await verifyCorrelations();
+    return { result, itemsFound: result.verified };
   });
 
 const runGraph = () =>
@@ -108,11 +128,17 @@ async function main(): Promise<void> {
     case "enrich":
       await runEnrich();
       break;
+    case "prices":
+      await runPrices();
+      break;
     case "mentions":
       await runMentions();
       break;
     case "correlate":
       await runCorrelate();
+      break;
+    case "verify":
+      await runVerify();
       break;
     case "graph":
       await runGraph();
@@ -124,8 +150,10 @@ async function main(): Promise<void> {
       await runStatements();
       await runActions();
       await runEnrich();
+      await runPrices();
       await runMentions();
       await runCorrelate();
+      await runVerify();
       await runGraph();
       break;
     case "post-parse":
@@ -133,8 +161,10 @@ async function main(): Promise<void> {
       await runStatements();
       await runActions();
       await runEnrich();
+      await runPrices();
       await runMentions();
       await runCorrelate();
+      await runVerify();
       await runGraph();
       break;
     default:

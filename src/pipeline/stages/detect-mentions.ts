@@ -65,6 +65,16 @@ const WEAK_SOLO_TOKENS = new Set([
   "river", "creek", "ridge", "field", "stone", "white", "black", "green",
   "north", "south", "prime", "union", "grand", "royal", "crown", "eagle",
   "liberty", "summit", "vista", "metro", "civic", "public", "patriot",
+  // geographic / generic adjectives that recur in company names but match
+  // unrelated political language ("Southern Co" vs. "southern border").
+  "southern", "northern", "eastern", "western", "central", "american",
+  "america", "national", "general", "pacific", "atlantic", "commerce",
+  "citizens", "citizen", "capital", "frontier", "heritage", "mountain",
+  "valley", "harbor", "global", "united", "first", "premier", "paramount",
+  "sterling", "freedom", "victory", "alliance", "horizon", "legacy", "future",
+  "vision", "pioneer", "century", "standard", "republic", "independence",
+  "select", "premium", "advance", "advanced", "enterprise", "service",
+  "country", "border", "energy", "power", "digital", "global", "national",
 ]);
 
 /**

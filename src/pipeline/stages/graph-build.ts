@@ -93,6 +93,7 @@ export async function buildGraph(): Promise<GraphResult> {
     })
     .from(correlations)
     .innerJoin(transactions, eq(correlations.transactionId, transactions.id))
+    .where(sql`${correlations.verifiedGenuine} is not false`)
     .groupBy(
       transactions.companyId,
       correlations.eventKind,

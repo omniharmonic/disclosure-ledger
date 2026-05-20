@@ -44,9 +44,13 @@ export const companies = pgTable(
     figi: text("figi"),
     parentId: uuid("parent_id"),
     sector: text("sector"), // GICS sector
-    industry: text("industry"), // GICS industry
+    industry: text("industry"), // SIC industry description
     aliases: text("aliases").array(), // brands, subsidiaries, products
     description: text("description"),
+    website: text("website"),
+    oneLiner: text("one_liner"), // neutral one-sentence description
+    impactSummary: text("impact_summary"), // factual Trump-administration intersection
+    impactSources: text("impact_sources").array(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
@@ -228,6 +232,9 @@ export const correlations = pgTable(
     signalScore: real("signal_score").notNull(), // 0..100
     components: jsonb("components").notNull(), // every component value (auditable)
     scoringVersion: text("scoring_version").notNull(),
+    // LLM reasoning verification (production pipeline; null = unverified).
+    verifiedGenuine: boolean("verified_genuine"),
+    verdictReason: text("verdict_reason"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [

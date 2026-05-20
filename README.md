@@ -1,4 +1,4 @@
-# Disclosure Ledger — Presidential Conflict-of-Interest Tracker
+# Trump Stock Tracker
 
 A civic-transparency platform that ingests the President's securities-disclosure
 filings (OGE Form 278-T / 278e) into rigorous structured data, layers in his

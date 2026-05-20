@@ -14,8 +14,10 @@ export type Stage =
   | "ingest-statements"
   | "ingest-actions"
   | "enrich"
+  | "ingest-prices"
   | "detect-mentions"
   | "correlate"
+  | "verify-correlations"
   | "graph-build";
 
 export interface RunHandle {
