@@ -7,7 +7,16 @@
  * confirms them (PRD FR-O3, NFR "Accuracy").
  */
 import { db } from "@/db";
-import { filings, transactions, companies } from "@/db/schema";
+import {
+  filings,
+  transactions,
+  companies,
+  statements,
+  actions,
+  correlations,
+  graphEdges,
+  persons,
+} from "@/db/schema";
 import { and, or, eq, gte, lte, ilike, desc, asc, sql, inArray, count } from "drizzle-orm";
 
 export const PUBLIC_FILING_STATUSES = ["parsed", "published"] as const;
@@ -176,6 +185,174 @@ export interface SiteStats {
   lastFilingDate: string | null;
   estimatedValueMin: number;
   estimatedValueMax: number;
+}
+
+export interface CorrelationView {
+  id: string;
+  eventKind: "statement" | "action";
+  daysGap: number;
+  signalScore: number;
+  components: Record<string, number>;
+  eventDate: string;
+  eventTitle: string;
+  eventUrl: string;
+}
+
+/** Correlations for one transaction, highest signal first. */
+export async function getCorrelations(transactionId: string): Promise<CorrelationView[]> {
+  const rows = await db
+    .select({
+      id: correlations.id,
+      eventKind: correlations.eventKind,
+      daysGap: correlations.daysGap,
+      signalScore: correlations.signalScore,
+      components: correlations.components,
+      statementText: statements.fullText,
+      statementDate: statements.spokenAt,
+      statementUrl: statements.sourceUrl,
+      actionTitle: actions.title,
+      actionDate: actions.occurredOn,
+      actionUrl: actions.sourceUrl,
+    })
+    .from(correlations)
+    .leftJoin(statements, eq(correlations.statementId, statements.id))
+    .leftJoin(actions, eq(correlations.actionId, actions.id))
+    .where(eq(correlations.transactionId, transactionId))
+    .orderBy(desc(correlations.signalScore));
+
+  return rows.map((r) => ({
+    id: r.id,
+    eventKind: r.eventKind as "statement" | "action",
+    daysGap: r.daysGap,
+    signalScore: r.signalScore,
+    components: (r.components ?? {}) as Record<string, number>,
+    eventDate: (r.eventKind === "statement" ? r.statementDate : r.actionDate) ?? "",
+    eventTitle:
+      r.eventKind === "statement"
+        ? (r.statementText ?? "").slice(0, 240)
+        : (r.actionTitle ?? ""),
+    eventUrl: (r.eventKind === "statement" ? r.statementUrl : r.actionUrl) ?? "",
+  }));
+}
+
+export interface GraphNode {
+  id: string;
+  type: string;
+  label: string;
+  val: number;
+}
+export interface GraphLink {
+  source: string;
+  target: string;
+  rel: string;
+  weight: number;
+}
+
+/** The full knowledge graph as nodes + links for force-directed rendering. */
+export async function getGraph(): Promise<{ nodes: GraphNode[]; links: GraphLink[] }> {
+  const edges = await db.select().from(graphEdges);
+  const ids: Record<string, Set<string>> = {};
+  for (const e of edges) {
+    (ids[e.srcType] ??= new Set()).add(e.srcId);
+    (ids[e.dstType] ??= new Set()).add(e.dstId);
+  }
+  const labels = new Map<string, string>();
+  const key = (t: string, id: string) => `${t}:${id}`;
+
+  if (ids.person?.size) {
+    for (const p of await db.select().from(persons)) labels.set(key("person", p.id), p.fullName);
+  }
+  if (ids.company?.size) {
+    for (const c of await db.select().from(companies))
+      labels.set(key("company", c.id), c.ticker ?? c.name);
+  }
+  if (ids.filing?.size) {
+    for (const f of await db.select().from(filings))
+      labels.set(key("filing", f.id), `${f.formType} ${f.filingDate}`);
+  }
+  if (ids.statement?.size) {
+    for (const s of await db.select().from(statements))
+      labels.set(key("statement", s.id), s.fullText.slice(0, 50));
+  }
+  if (ids.action?.size) {
+    for (const a of await db.select().from(actions))
+      labels.set(key("action", a.id), a.title.slice(0, 60));
+  }
+
+  const nodeMap = new Map<string, GraphNode>();
+  const ensure = (type: string, id: string) => {
+    const k = key(type, id);
+    if (!nodeMap.has(k))
+      nodeMap.set(k, { id: k, type, label: labels.get(k) ?? type, val: 1 });
+    else nodeMap.get(k)!.val += 1;
+  };
+  const links: GraphLink[] = edges.map((e) => {
+    ensure(e.srcType, e.srcId);
+    ensure(e.dstType, e.dstId);
+    return {
+      source: key(e.srcType, e.srcId),
+      target: key(e.dstType, e.dstId),
+      rel: e.relType,
+      weight: e.weight ?? 1,
+    };
+  });
+  return { nodes: [...nodeMap.values()], links };
+}
+
+export interface TimelineEvent {
+  id: string;
+  kind: "trade" | "statement" | "action";
+  date: string;
+  label: string;
+}
+
+/** Dated events across all three lanes, for the timeline view. */
+export async function getTimelineEvents(limit = 400): Promise<TimelineEvent[]> {
+  const trades = await db
+    .select({
+      id: transactions.id,
+      date: transactions.transactionDate,
+      desc: transactions.descriptionRaw,
+      type: transactions.transactionType,
+    })
+    .from(transactions)
+    .innerJoin(filings, eq(transactions.filingId, filings.id))
+    .where(inArray(filings.status, [...PUBLIC_FILING_STATUSES]))
+    .orderBy(desc(transactions.transactionDate))
+    .limit(limit);
+
+  const stmts = await db
+    .select({ id: statements.id, date: statements.spokenAt, text: statements.fullText })
+    .from(statements)
+    .orderBy(desc(statements.spokenAt))
+    .limit(limit);
+
+  const acts = await db
+    .select({ id: actions.id, date: actions.occurredOn, title: actions.title })
+    .from(actions)
+    .orderBy(desc(actions.occurredOn))
+    .limit(limit);
+
+  return [
+    ...trades.map((t) => ({
+      id: t.id,
+      kind: "trade" as const,
+      date: t.date,
+      label: `${t.type}: ${t.desc.slice(0, 60)}`,
+    })),
+    ...stmts.map((s) => ({
+      id: s.id,
+      kind: "statement" as const,
+      date: s.date,
+      label: s.text.slice(0, 80),
+    })),
+    ...acts.map((a) => ({
+      id: a.id,
+      kind: "action" as const,
+      date: a.date,
+      label: a.title.slice(0, 80),
+    })),
+  ];
 }
 
 /** Headline statistics for the dashboard. */

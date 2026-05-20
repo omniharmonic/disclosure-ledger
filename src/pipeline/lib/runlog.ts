@@ -13,6 +13,7 @@ export type Stage =
   | "ingest-statements"
   | "ingest-actions"
   | "enrich"
+  | "detect-mentions"
   | "correlate"
   | "graph-build";
 

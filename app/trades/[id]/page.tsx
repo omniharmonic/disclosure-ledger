@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getTransaction } from "@/lib/queries";
+import { getTransaction, getCorrelations } from "@/lib/queries";
 import { formatDate, formatAmount, typeColor } from "@/lib/format";
 import { getBand } from "@/lib/bands";
 
@@ -14,6 +14,7 @@ export default async function TradeDetailPage({
   const { id } = await params;
   const t = await getTransaction(id);
   if (!t) notFound();
+  const correlations = await getCorrelations(id);
 
   const band = getBand(t.amountBand);
   const facts: [string, React.ReactNode][] = [
@@ -53,11 +54,72 @@ export default async function TradeDetailPage({
         <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)]">
           Timing correlations
         </h2>
-        <p className="mt-2 rounded border border-dashed border-[var(--color-rule)] p-4 text-sm text-[var(--color-muted)]">
-          Statements and official actions correlated with this trade are surfaced here once
-          the correlation engine (Phase 3) is populated. Each correlation will show its full
-          score breakdown and a primary-source link.
-        </p>
+        {correlations.length === 0 ? (
+          <p className="mt-2 rounded border border-dashed border-[var(--color-rule)] p-4 text-sm text-[var(--color-muted)]">
+            No statements or official actions about this security were found within the
+            correlation window (45 days before to 30 days after the transaction).
+          </p>
+        ) : (
+          <div className="mt-3 space-y-3">
+            {correlations.map((c) => (
+              <div key={c.id} className="rounded border border-[var(--color-rule)] bg-white p-4">
+                <div className="flex items-baseline justify-between gap-4">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+                    {c.eventKind === "statement" ? "Public statement" : "Official action"} ·{" "}
+                    {c.daysGap === 0
+                      ? "same day"
+                      : c.daysGap > 0
+                        ? `${c.daysGap}d after trade`
+                        : `${-c.daysGap}d before trade`}
+                  </span>
+                  <span
+                    className="rounded px-2 py-0.5 text-xs font-bold tabular text-white"
+                    style={{
+                      background:
+                        c.signalScore >= 60
+                          ? "var(--color-accent)"
+                          : c.signalScore >= 40
+                            ? "#b8860b"
+                            : "var(--color-muted)",
+                    }}
+                    title="Potential conflict signal — an analytical index, not a verdict"
+                  >
+                    signal {c.signalScore.toFixed(0)}/100
+                  </span>
+                </div>
+                <p className="mt-2 text-sm">
+                  {c.eventTitle}
+                  {c.eventTitle.length >= 240 ? "…" : ""}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--color-muted)]">
+                  {Object.entries(c.components).map(([k, v]) => (
+                    <span key={k} className="tabular">
+                      {k}: {typeof v === "number" ? v.toFixed(2) : String(v)}
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-2 text-xs">
+                  <span className="text-[var(--color-muted)]">{formatDate(c.eventDate)} · </span>
+                  <a
+                    href={c.eventUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[var(--color-accent)] hover:underline"
+                  >
+                    primary source ↗
+                  </a>
+                </div>
+              </div>
+            ))}
+            <p className="text-xs text-[var(--color-muted)]">
+              The signal score is a transparent analytical index (see{" "}
+              <Link href="/methodology" className="underline">
+                methodology
+              </Link>
+              ), not a finding of wrongdoing. Correlation is not causation.
+            </p>
+          </div>
+        )}
       </section>
 
       <section className="rounded border border-[var(--color-rule)] bg-white p-5 text-sm">

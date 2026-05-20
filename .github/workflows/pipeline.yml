@@ -1,0 +1,67 @@
+name: ingestion-pipeline
+
+# Daily civic-data ingestion pipeline. Runs on GitHub Actions rather than
+# Vercel: a public repo gets unlimited free CI minutes, full Linux VMs (so
+# Tesseract / pdfplumber "just work"), and no function-duration ceiling.
+
+on:
+  schedule:
+    - cron: "0 9 * * *" # 09:00 UTC daily
+  workflow_dispatch: {} # manual trigger
+
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Tesseract OCR
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr
+
+      - name: Cache OCR + downloaded PDFs
+        uses: actions/cache@v4
+        with:
+          path: |
+            data/pdfs
+            data/cache
+          key: pipeline-data-${{ github.run_id }}
+          restore-keys: pipeline-data-
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install Python dependencies
+        run: |
+          python -m venv pipeline/.venv
+          pipeline/.venv/bin/pip install --upgrade pip
+          pipeline/.venv/bin/pip install -r pipeline/requirements.txt
+
+      - name: Run pipeline
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
+          TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+          CRAWLER_USER_AGENT: "disclosure-ledger civic-transparency project (contact: benjamin@opencivics.co)"
+        run: npx tsx src/pipeline/run.ts all
+
+      - name: Trigger site revalidation
+        if: success() && env.REVALIDATE_URL != ''
+        env:
+          REVALIDATE_URL: ${{ secrets.REVALIDATE_URL }}
+        run: curl -fsS "$REVALIDATE_URL" || true

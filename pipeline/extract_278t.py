@@ -196,6 +196,17 @@ def parse_page(text, page_num, filing_year):
 
 
 def ocr_page(pdf_path, page_index):
+    """OCR one page, caching the result — OCR is the slow, deterministic step."""
+    import os  # noqa: PLC0415
+
+    cache_dir = os.path.join("data", "cache", "ocr")
+    os.makedirs(cache_dir, exist_ok=True)
+    base = os.path.splitext(os.path.basename(pdf_path))[0]
+    cache_path = os.path.join(cache_dir, f"{base}.p{page_index}.txt")
+    if os.path.exists(cache_path):
+        with open(cache_path, encoding="utf-8") as fh:
+            return fh.read()
+
     import pypdfium2 as pdfium  # noqa: PLC0415
     import pytesseract  # noqa: PLC0415
 
@@ -204,7 +215,10 @@ def ocr_page(pdf_path, page_index):
     # PSM 4 ("single column of variable-size text") is the right model for
     # these one-column transaction forms. PSM 6 ("uniform block") smears the
     # table and loses ~98% of the digits.
-    return pytesseract.image_to_string(img, config="--psm 4")
+    text = pytesseract.image_to_string(img, config="--psm 4")
+    with open(cache_path, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    return text
 
 
 def extract(pdf_path, filing_iso=None):

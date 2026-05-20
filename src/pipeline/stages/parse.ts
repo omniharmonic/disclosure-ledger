@@ -23,7 +23,7 @@ const SCRIPT = join(process.cwd(), "pipeline", "extract_278t.py");
 
 const VALID_TYPES = new Set(["Purchase", "Sale", "Sale (Partial)", "Exchange"]);
 /** Filings scoring below this are held for human review. */
-const CONFIDENCE_THRESHOLD = 0.75;
+const CONFIDENCE_THRESHOLD = 0.7;
 
 export interface ExtractedRow {
   sourcePage: number;
@@ -60,19 +60,32 @@ async function runExtractor(pdfPath: string, filingDate: string): Promise<Extrac
   return JSON.parse(stdout) as ExtractorOutput;
 }
 
-/** Validate a single extracted row; returns the issues found (empty = clean). */
-function validateRow(row: ExtractedRow): string[] {
+/**
+ * Row *validity* — whether a row is a publishable transaction. A row is valid
+ * if it has a real date, a real amount band, and a description. The transaction
+ * TYPE is deliberately excluded: OCR frequently mangles the word "purchase",
+ * but a row with a sound date + amount + security is still a real, publishable
+ * disclosure. Type quality is scored separately, not used to reject rows.
+ */
+function rowValidityIssues(row: ExtractedRow): string[] {
   const issues: string[] = [];
-  if (!VALID_TYPES.has(row.transactionType)) issues.push("type");
   if (Number.isNaN(Date.parse(row.transactionDate))) issues.push("date");
   if (row.amountBand < 1 || row.amountBand > 10) issues.push("band");
   if (!row.descriptionRaw || row.descriptionRaw.length < 3) issues.push("description");
   return issues;
 }
 
+function typeKnown(row: ExtractedRow): boolean {
+  return VALID_TYPES.has(row.transactionType);
+}
+
 /**
  * Validation gate + confidence score for a whole filing.
- * Confidence blends per-row cleanliness, OCR penalty, and page reconciliation.
+ *
+ * confidence = validShare · (0.75 + 0.25·typeKnownShare) · (1 − 0.10·ocrShare)
+ * and is further discounted if page-count reconciliation fails. This rewards
+ * complete, well-typed, page-reconciled filings while still publishing OCR
+ * filings whose dates/amounts are sound but whose type labels are noisy.
  */
 function scoreFiling(out: ExtractorOutput): {
   confidence: number;
@@ -82,8 +95,8 @@ function scoreFiling(out: ExtractorOutput): {
   const rows = out.rows;
   if (rows.length === 0) return { confidence: 0, pageReconciled: false, ocrShare: 1 };
 
-  const cleanRows = rows.filter((r) => validateRow(r).length === 0).length;
-  const rowScore = cleanRows / rows.length;
+  const validShare = rows.filter((r) => rowValidityIssues(r).length === 0).length / rows.length;
+  const typeShare = rows.filter(typeKnown).length / rows.length;
 
   const ocrPages = out.pages.filter((p) => p.textSource === "ocr" && p.rowsFound > 0).length;
   const dataPages = out.pages.filter((p) => p.rowsFound > 0).length || 1;
@@ -92,8 +105,8 @@ function scoreFiling(out: ExtractorOutput): {
   const pageReconciled =
     out.declaredPageTotal === null || out.declaredPageTotal === out.pageCount;
 
-  let confidence = rowScore * (1 - 0.15 * ocrShare);
-  if (!pageReconciled) confidence *= 0.8;
+  let confidence = validShare * (0.75 + 0.25 * typeShare) * (1 - 0.1 * ocrShare);
+  if (!pageReconciled) confidence *= 0.85;
   return { confidence: Math.round(confidence * 1000) / 1000, pageReconciled, ocrShare };
 }
 
@@ -146,7 +159,8 @@ export async function parseFilings(): Promise<ParseResult> {
           await tx.insert(transactions).values(
             out.rows.map((r) => {
               const band = getBand(r.amountBand);
-              const valid = validateRow(r).length === 0;
+              const valid = rowValidityIssues(r).length === 0;
+              const rowConf = !valid ? 0.3 : typeKnown(r) ? 1 : 0.7;
               return {
                 filingId: filing.id,
                 personId: filing.personId,
@@ -160,7 +174,7 @@ export async function parseFilings(): Promise<ParseResult> {
                 amountBand: r.amountBand,
                 amountMin: band.min,
                 amountMax: band.max,
-                rowConfidence: valid ? 1 : 0.5,
+                rowConfidence: rowConf,
               };
             }),
           );

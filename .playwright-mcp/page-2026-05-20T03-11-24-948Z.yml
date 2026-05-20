@@ -1,0 +1,475 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - navigation [ref=e3]:
+      - link "DISCLOSURE LEDGER" [ref=e4] [cursor=pointer]:
+        - /url: /
+      - link "Trades" [ref=e5] [cursor=pointer]:
+        - /url: /trades
+      - link "Timeline" [ref=e6] [cursor=pointer]:
+        - /url: /timeline
+      - link "Graph" [ref=e7] [cursor=pointer]:
+        - /url: /graph
+      - link "Filings" [ref=e8] [cursor=pointer]:
+        - /url: /filings
+      - link "Methodology" [ref=e9] [cursor=pointer]:
+        - /url: /methodology
+      - link "API" [ref=e10] [cursor=pointer]:
+        - /url: /api-docs
+  - main [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - link "← All trades" [ref=e14] [cursor=pointer]:
+          - /url: /trades
+        - heading "STT — Unknown" [level=1] [ref=e15]
+        - paragraph [ref=e16]: STATE STREET SPDR S&P 500 TRUST ETF solo
+      - generic [ref=e17]:
+        - generic [ref=e18]:
+          - term [ref=e19]: Transaction date
+          - definition [ref=e20]: Jan 28, 2026
+        - generic [ref=e21]:
+          - term [ref=e22]: Type
+          - definition [ref=e23]: Unknown
+        - generic [ref=e24]:
+          - term [ref=e25]: Amount range
+          - definition [ref=e26]: $1,000,001 – $5,000,000
+        - generic [ref=e27]:
+          - term [ref=e28]: Statutory band
+          - definition [ref=e29]: Band 7 of 10
+        - generic [ref=e30]:
+          - term [ref=e31]: Ticker
+          - definition [ref=e32]: STT
+        - generic [ref=e33]:
+          - term [ref=e34]: Sector
+          - definition [ref=e35]: —
+        - generic [ref=e36]:
+          - term [ref=e37]: Late notification
+          - definition [ref=e38]: "No"
+        - generic [ref=e39]:
+          - term [ref=e40]: Filing date
+          - definition [ref=e41]: May 7, 2026
+      - generic [ref=e42]:
+        - heading "Timing correlations" [level=2] [ref=e43]
+        - generic [ref=e44]:
+          - generic [ref=e45]:
+            - generic [ref=e46]:
+              - generic [ref=e47]: Official action · same day
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e48]: signal 89/100
+            - paragraph [ref=e49]: Addressing State and Local Failures To Rebuild Los Angeles After Wildfire Disasters
+            - generic [ref=e50]:
+              - generic [ref=e51]: "authority: 1.00"
+              - generic [ref=e52]: "corroboration: 1.00"
+              - generic [ref=e53]: "tradeMagnitude: 0.68"
+              - generic [ref=e54]: "entitySpecificity: 1.00"
+              - generic [ref=e55]: "temporalProximity: 1.00"
+              - generic [ref=e56]: "directionalConsistency: 0.50"
+            - generic [ref=e57]:
+              - generic [ref=e58]: Jan 28, 2026 ·
+              - link "primary source ↗" [ref=e59] [cursor=pointer]:
+                - /url: https://www.federalregister.gov/documents/2026/01/29/2026-01871/addressing-state-and-local-failures-to-rebuild-los-angeles-after-wildfire-disasters
+          - generic [ref=e60]:
+            - generic [ref=e61]:
+              - generic [ref=e62]: Public statement · 1d after trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e63]: signal 87/100
+            - paragraph [ref=e64]: Leigh Wambsganss, a Republican running for the State Senate in the suburbs of Fort Worth, Texas, will be a GREAT Candidate and has my Complete and Total Endorsement. Thank you for your attention to this matter!!! President DJT
+            - generic [ref=e65]:
+              - generic [ref=e66]: "authority: 1.00"
+              - generic [ref=e67]: "corroboration: 1.00"
+              - generic [ref=e68]: "tradeMagnitude: 0.68"
+              - generic [ref=e69]: "entitySpecificity: 1.00"
+              - generic [ref=e70]: "temporalProximity: 0.93"
+              - generic [ref=e71]: "directionalConsistency: 0.50"
+            - generic [ref=e72]:
+              - generic [ref=e73]: Jan 29, 2026 ·
+              - link "primary source ↗" [ref=e74] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115982747344520072
+          - generic [ref=e75]:
+            - generic [ref=e76]:
+              - generic [ref=e77]: Public statement · 1d before trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e78]: signal 87/100
+            - paragraph [ref=e79]: Highly Respected and very popular State Treasurer, Stacy Garrity, is running to be the next Governor of the GREAT Commonwealth of Pennsylvania, a very special place to me in that we had a LANDSLIDE Presidential Election Win, just over one y…
+            - generic [ref=e80]:
+              - generic [ref=e81]: "authority: 1.00"
+              - generic [ref=e82]: "corroboration: 1.00"
+              - generic [ref=e83]: "tradeMagnitude: 0.68"
+              - generic [ref=e84]: "entitySpecificity: 1.00"
+              - generic [ref=e85]: "temporalProximity: 0.93"
+              - generic [ref=e86]: "directionalConsistency: 0.50"
+            - generic [ref=e87]:
+              - generic [ref=e88]: Jan 27, 2026 ·
+              - link "primary source ↗" [ref=e89] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115970244299178641
+          - generic [ref=e90]:
+            - generic [ref=e91]:
+              - generic [ref=e92]: Public statement · 1d before trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e93]: signal 87/100
+            - paragraph [ref=e94]: Highly Respected and very popular State Treasurer, Stacy Garrity, is running to be the next Governor of the GREAT Commonwealth of Pennsylvania, a very special place to me in that we had a LANDSLIDE Presidential Election Win, just over one y…
+            - generic [ref=e95]:
+              - generic [ref=e96]: "authority: 1.00"
+              - generic [ref=e97]: "corroboration: 1.00"
+              - generic [ref=e98]: "tradeMagnitude: 0.68"
+              - generic [ref=e99]: "entitySpecificity: 1.00"
+              - generic [ref=e100]: "temporalProximity: 0.93"
+              - generic [ref=e101]: "directionalConsistency: 0.50"
+            - generic [ref=e102]:
+              - generic [ref=e103]: Jan 27, 2026 ·
+              - link "primary source ↗" [ref=e104] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115970244299178641
+          - generic [ref=e105]:
+            - generic [ref=e106]:
+              - generic [ref=e107]: Public statement · 1d before trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e108]: signal 87/100
+            - paragraph [ref=e109]: Highly Respected America First Congressman, Tom Tiffany, is running to be the next Governor of the GREAT State of Wisconsin, a very special place to me in that we had a BIG Presidential Election Win just over one year ago, on November 5, 20…
+            - generic [ref=e110]:
+              - generic [ref=e111]: "authority: 1.00"
+              - generic [ref=e112]: "corroboration: 1.00"
+              - generic [ref=e113]: "tradeMagnitude: 0.68"
+              - generic [ref=e114]: "entitySpecificity: 1.00"
+              - generic [ref=e115]: "temporalProximity: 0.93"
+              - generic [ref=e116]: "directionalConsistency: 0.50"
+            - generic [ref=e117]:
+              - generic [ref=e118]: Jan 27, 2026 ·
+              - link "primary source ↗" [ref=e119] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115970033433071326
+          - generic [ref=e120]:
+            - generic [ref=e121]:
+              - generic [ref=e122]: Public statement · 1d before trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e123]: signal 87/100
+            - paragraph [ref=e124]: Highly Respected America First Congressman, Tom Tiffany, is running to be the next Governor of the GREAT State of Wisconsin, a very special place to me in that we had a BIG Presidential Election Win just over one year ago, on November 5, 20…
+            - generic [ref=e125]:
+              - generic [ref=e126]: "authority: 1.00"
+              - generic [ref=e127]: "corroboration: 1.00"
+              - generic [ref=e128]: "tradeMagnitude: 0.68"
+              - generic [ref=e129]: "entitySpecificity: 1.00"
+              - generic [ref=e130]: "temporalProximity: 0.93"
+              - generic [ref=e131]: "directionalConsistency: 0.50"
+            - generic [ref=e132]:
+              - generic [ref=e133]: Jan 27, 2026 ·
+              - link "primary source ↗" [ref=e134] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115970033433071326
+          - generic [ref=e135]:
+            - generic [ref=e136]:
+              - generic [ref=e137]: Public statement · 1d before trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e138]: signal 87/100
+            - paragraph [ref=e139]: It is my Great Honor to endorse America First Patriot, Jeff Ellington, a terrific Candidate for Indiana's 39th State Senate District (which I won by a whopping 55 points!). Jeff will be a fantastic replacement for RINO Eric Bassler, who may…
+            - generic [ref=e140]:
+              - generic [ref=e141]: "authority: 1.00"
+              - generic [ref=e142]: "corroboration: 1.00"
+              - generic [ref=e143]: "tradeMagnitude: 0.68"
+              - generic [ref=e144]: "entitySpecificity: 1.00"
+              - generic [ref=e145]: "temporalProximity: 0.93"
+              - generic [ref=e146]: "directionalConsistency: 0.50"
+            - generic [ref=e147]:
+              - generic [ref=e148]: Jan 27, 2026 ·
+              - link "primary source ↗" [ref=e149] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115969989606605553
+          - generic [ref=e150]:
+            - generic [ref=e151]:
+              - generic [ref=e152]: Public statement · 1d before trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e153]: signal 87/100
+            - paragraph [ref=e154]: It is my Great Honor to endorse America First Patriot, Jeff Ellington, a terrific Candidate for Indiana's 39th State Senate District (which I won by a whopping 55 points!). Jeff will be a fantastic replacement for RINO Eric Bassler, who may…
+            - generic [ref=e155]:
+              - generic [ref=e156]: "authority: 1.00"
+              - generic [ref=e157]: "corroboration: 1.00"
+              - generic [ref=e158]: "tradeMagnitude: 0.68"
+              - generic [ref=e159]: "entitySpecificity: 1.00"
+              - generic [ref=e160]: "temporalProximity: 0.93"
+              - generic [ref=e161]: "directionalConsistency: 0.50"
+            - generic [ref=e162]:
+              - generic [ref=e163]: Jan 27, 2026 ·
+              - link "primary source ↗" [ref=e164] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115969989606605553
+          - generic [ref=e165]:
+            - generic [ref=e166]:
+              - generic [ref=e167]: Public statement · 1d before trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e168]: signal 87/100
+            - paragraph [ref=e169]: It is my Great Honor to endorse America First Patriot, Jeff Ellington, a terrific Candidate for Indiana's 39th State Senate District (which I won by a whopping 55 points!). Jeff will be a fantastic replacement for RINO Eric Bassler, who may…
+            - generic [ref=e170]:
+              - generic [ref=e171]: "authority: 1.00"
+              - generic [ref=e172]: "corroboration: 1.00"
+              - generic [ref=e173]: "tradeMagnitude: 0.68"
+              - generic [ref=e174]: "entitySpecificity: 1.00"
+              - generic [ref=e175]: "temporalProximity: 0.93"
+              - generic [ref=e176]: "directionalConsistency: 0.50"
+            - generic [ref=e177]:
+              - generic [ref=e178]: Jan 27, 2026 ·
+              - link "primary source ↗" [ref=e179] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115969989606605553
+          - generic [ref=e180]:
+            - generic [ref=e181]:
+              - generic [ref=e182]: Public statement · 1d before trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e183]: signal 87/100
+            - paragraph [ref=e184]: It is my Great Honor to endorse America First Patriot, Jeff Ellington, a terrific Candidate for Indiana's 39th State Senate District (which I won by a whopping 55 points!). Jeff will be a fantastic replacement for RINO Eric Bassler, who may…
+            - generic [ref=e185]:
+              - generic [ref=e186]: "authority: 1.00"
+              - generic [ref=e187]: "corroboration: 1.00"
+              - generic [ref=e188]: "tradeMagnitude: 0.68"
+              - generic [ref=e189]: "entitySpecificity: 1.00"
+              - generic [ref=e190]: "temporalProximity: 0.93"
+              - generic [ref=e191]: "directionalConsistency: 0.50"
+            - generic [ref=e192]:
+              - generic [ref=e193]: Jan 27, 2026 ·
+              - link "primary source ↗" [ref=e194] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115969989606605553
+          - generic [ref=e195]:
+            - generic [ref=e196]:
+              - generic [ref=e197]: Public statement · 1d before trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e198]: signal 87/100
+            - paragraph [ref=e199]: It is my Great Honor to endorse America First Patriot, Jeff Ellington, a terrific Candidate for Indiana's 39th State Senate District (which I won by a whopping 55 points!). Jeff will be a fantastic replacement for RINO Eric Bassler, who may…
+            - generic [ref=e200]:
+              - generic [ref=e201]: "authority: 1.00"
+              - generic [ref=e202]: "corroboration: 1.00"
+              - generic [ref=e203]: "tradeMagnitude: 0.68"
+              - generic [ref=e204]: "entitySpecificity: 1.00"
+              - generic [ref=e205]: "temporalProximity: 0.93"
+              - generic [ref=e206]: "directionalConsistency: 0.50"
+            - generic [ref=e207]:
+              - generic [ref=e208]: Jan 27, 2026 ·
+              - link "primary source ↗" [ref=e209] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115969989606605553
+          - generic [ref=e210]:
+            - generic [ref=e211]:
+              - generic [ref=e212]: Public statement · 1d before trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e213]: signal 87/100
+            - paragraph [ref=e214]: It is my Great Honor to endorse America First Patriot, Jeff Ellington, a terrific Candidate for Indiana's 39th State Senate District (which I won by a whopping 55 points!). Jeff will be a fantastic replacement for RINO Eric Bassler, who may…
+            - generic [ref=e215]:
+              - generic [ref=e216]: "authority: 1.00"
+              - generic [ref=e217]: "corroboration: 1.00"
+              - generic [ref=e218]: "tradeMagnitude: 0.68"
+              - generic [ref=e219]: "entitySpecificity: 1.00"
+              - generic [ref=e220]: "temporalProximity: 0.93"
+              - generic [ref=e221]: "directionalConsistency: 0.50"
+            - generic [ref=e222]:
+              - generic [ref=e223]: Jan 27, 2026 ·
+              - link "primary source ↗" [ref=e224] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115969989606605553
+          - generic [ref=e225]:
+            - generic [ref=e226]:
+              - generic [ref=e227]: Public statement · 1d before trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e228]: signal 87/100
+            - paragraph [ref=e229]: Vigo County Commissioner Brenda Wilson, a Proven America First Patriot, is running against "No Goode" Greg Goode (BAD FOR THE U.S.A.!) in the Republican Primary for Indiana's 38th Senate District, which I won by 28 points! "No Goode" is an …
+            - generic [ref=e230]:
+              - generic [ref=e231]: "authority: 1.00"
+              - generic [ref=e232]: "corroboration: 1.00"
+              - generic [ref=e233]: "tradeMagnitude: 0.68"
+              - generic [ref=e234]: "entitySpecificity: 1.00"
+              - generic [ref=e235]: "temporalProximity: 0.93"
+              - generic [ref=e236]: "directionalConsistency: 0.50"
+            - generic [ref=e237]:
+              - generic [ref=e238]: Jan 27, 2026 ·
+              - link "primary source ↗" [ref=e239] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115969971098103360
+          - generic [ref=e240]:
+            - generic [ref=e241]:
+              - generic [ref=e242]: Public statement · 1d before trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e243]: signal 87/100
+            - paragraph [ref=e244]: Vigo County Commissioner Brenda Wilson, a Proven America First Patriot, is running against "No Goode" Greg Goode (BAD FOR THE U.S.A.!) in the Republican Primary for Indiana's 38th Senate District, which I won by 28 points! "No Goode" is an …
+            - generic [ref=e245]:
+              - generic [ref=e246]: "authority: 1.00"
+              - generic [ref=e247]: "corroboration: 1.00"
+              - generic [ref=e248]: "tradeMagnitude: 0.68"
+              - generic [ref=e249]: "entitySpecificity: 1.00"
+              - generic [ref=e250]: "temporalProximity: 0.93"
+              - generic [ref=e251]: "directionalConsistency: 0.50"
+            - generic [ref=e252]:
+              - generic [ref=e253]: Jan 27, 2026 ·
+              - link "primary source ↗" [ref=e254] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115969971098103360
+          - generic [ref=e255]:
+            - generic [ref=e256]:
+              - generic [ref=e257]: Public statement · 1d before trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e258]: signal 87/100
+            - paragraph [ref=e259]: Vigo County Commissioner Brenda Wilson, a Proven America First Patriot, is running against "No Goode" Greg Goode (BAD FOR THE U.S.A.!) in the Republican Primary for Indiana's 38th Senate District, which I won by 28 points! "No Goode" is an …
+            - generic [ref=e260]:
+              - generic [ref=e261]: "authority: 1.00"
+              - generic [ref=e262]: "corroboration: 1.00"
+              - generic [ref=e263]: "tradeMagnitude: 0.68"
+              - generic [ref=e264]: "entitySpecificity: 1.00"
+              - generic [ref=e265]: "temporalProximity: 0.93"
+              - generic [ref=e266]: "directionalConsistency: 0.50"
+            - generic [ref=e267]:
+              - generic [ref=e268]: Jan 27, 2026 ·
+              - link "primary source ↗" [ref=e269] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115969971098103360
+          - generic [ref=e270]:
+            - generic [ref=e271]:
+              - generic [ref=e272]: Public statement · 1d before trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e273]: signal 87/100
+            - paragraph [ref=e274]: It is my Great Honor to endorse MAGA Warrior and Fountain County GOP Chair, Paula Copenhaver, a terrific Candidate for Indiana's 23rd State Senate District (which I won by 26 points!). Paula is running against an incompetent and ineffective…
+            - generic [ref=e275]:
+              - generic [ref=e276]: "authority: 1.00"
+              - generic [ref=e277]: "corroboration: 1.00"
+              - generic [ref=e278]: "tradeMagnitude: 0.68"
+              - generic [ref=e279]: "entitySpecificity: 1.00"
+              - generic [ref=e280]: "temporalProximity: 0.93"
+              - generic [ref=e281]: "directionalConsistency: 0.50"
+            - generic [ref=e282]:
+              - generic [ref=e283]: Jan 27, 2026 ·
+              - link "primary source ↗" [ref=e284] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115969963682592720
+          - generic [ref=e285]:
+            - generic [ref=e286]:
+              - generic [ref=e287]: Public statement · 1d before trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e288]: signal 87/100
+            - paragraph [ref=e289]: It is my Great Honor to endorse MAGA Warrior and Fountain County GOP Chair, Paula Copenhaver, a terrific Candidate for Indiana's 23rd State Senate District (which I won by 26 points!). Paula is running against an incompetent and ineffective…
+            - generic [ref=e290]:
+              - generic [ref=e291]: "authority: 1.00"
+              - generic [ref=e292]: "corroboration: 1.00"
+              - generic [ref=e293]: "tradeMagnitude: 0.68"
+              - generic [ref=e294]: "entitySpecificity: 1.00"
+              - generic [ref=e295]: "temporalProximity: 0.93"
+              - generic [ref=e296]: "directionalConsistency: 0.50"
+            - generic [ref=e297]:
+              - generic [ref=e298]: Jan 27, 2026 ·
+              - link "primary source ↗" [ref=e299] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115969963682592720
+          - generic [ref=e300]:
+            - generic [ref=e301]:
+              - generic [ref=e302]: Public statement · 1d before trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e303]: signal 87/100
+            - paragraph [ref=e304]: It is my Great Honor to endorse MAGA Warrior and Fountain County GOP Chair, Paula Copenhaver, a terrific Candidate for Indiana's 23rd State Senate District (which I won by 26 points!). Paula is running against an incompetent and ineffective…
+            - generic [ref=e305]:
+              - generic [ref=e306]: "authority: 1.00"
+              - generic [ref=e307]: "corroboration: 1.00"
+              - generic [ref=e308]: "tradeMagnitude: 0.68"
+              - generic [ref=e309]: "entitySpecificity: 1.00"
+              - generic [ref=e310]: "temporalProximity: 0.93"
+              - generic [ref=e311]: "directionalConsistency: 0.50"
+            - generic [ref=e312]:
+              - generic [ref=e313]: Jan 27, 2026 ·
+              - link "primary source ↗" [ref=e314] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115969963682592720
+          - generic [ref=e315]:
+            - generic [ref=e316]:
+              - generic [ref=e317]: Public statement · 1d before trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e318]: signal 87/100
+            - paragraph [ref=e319]: It is my Great Honor to endorse MAGA Warrior and Fountain County GOP Chair, Paula Copenhaver, a terrific Candidate for Indiana's 23rd State Senate District (which I won by 26 points!). Paula is running against an incompetent and ineffective…
+            - generic [ref=e320]:
+              - generic [ref=e321]: "authority: 1.00"
+              - generic [ref=e322]: "corroboration: 1.00"
+              - generic [ref=e323]: "tradeMagnitude: 0.68"
+              - generic [ref=e324]: "entitySpecificity: 1.00"
+              - generic [ref=e325]: "temporalProximity: 0.93"
+              - generic [ref=e326]: "directionalConsistency: 0.50"
+            - generic [ref=e327]:
+              - generic [ref=e328]: Jan 27, 2026 ·
+              - link "primary source ↗" [ref=e329] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115969963682592720
+          - generic [ref=e330]:
+            - generic [ref=e331]:
+              - generic [ref=e332]: Public statement · 1d before trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e333]: signal 87/100
+            - paragraph [ref=e334]: It is my Great Honor to endorse MAGA Warrior and Fountain County GOP Chair, Paula Copenhaver, a terrific Candidate for Indiana's 23rd State Senate District (which I won by 26 points!). Paula is running against an incompetent and ineffective…
+            - generic [ref=e335]:
+              - generic [ref=e336]: "authority: 1.00"
+              - generic [ref=e337]: "corroboration: 1.00"
+              - generic [ref=e338]: "tradeMagnitude: 0.68"
+              - generic [ref=e339]: "entitySpecificity: 1.00"
+              - generic [ref=e340]: "temporalProximity: 0.93"
+              - generic [ref=e341]: "directionalConsistency: 0.50"
+            - generic [ref=e342]:
+              - generic [ref=e343]: Jan 27, 2026 ·
+              - link "primary source ↗" [ref=e344] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115969963682592720
+          - generic [ref=e345]:
+            - generic [ref=e346]:
+              - generic [ref=e347]: Public statement · 1d before trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e348]: signal 87/100
+            - paragraph [ref=e349]: It is my Great Honor to endorse MAGA Patriot, Joe Mitchell, who is running to represent the fantastic people of Iowa's 2nd Congressional District. As a former Appointee in my Administration at the U.S. Department of Housing and Urban Develo…
+            - generic [ref=e350]:
+              - generic [ref=e351]: "authority: 1.00"
+              - generic [ref=e352]: "corroboration: 1.00"
+              - generic [ref=e353]: "tradeMagnitude: 0.68"
+              - generic [ref=e354]: "entitySpecificity: 1.00"
+              - generic [ref=e355]: "temporalProximity: 0.93"
+              - generic [ref=e356]: "directionalConsistency: 0.50"
+            - generic [ref=e357]:
+              - generic [ref=e358]: Jan 27, 2026 ·
+              - link "primary source ↗" [ref=e359] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115969943597305015
+          - generic [ref=e360]:
+            - generic [ref=e361]:
+              - generic [ref=e362]: Public statement · 1d before trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e363]: signal 87/100
+            - paragraph [ref=e364]: It is my Great Honor to endorse MAGA Patriot, Joe Mitchell, who is running to represent the fantastic people of Iowa's 2nd Congressional District. As a former Appointee in my Administration at the U.S. Department of Housing and Urban Develo…
+            - generic [ref=e365]:
+              - generic [ref=e366]: "authority: 1.00"
+              - generic [ref=e367]: "corroboration: 1.00"
+              - generic [ref=e368]: "tradeMagnitude: 0.68"
+              - generic [ref=e369]: "entitySpecificity: 1.00"
+              - generic [ref=e370]: "temporalProximity: 0.93"
+              - generic [ref=e371]: "directionalConsistency: 0.50"
+            - generic [ref=e372]:
+              - generic [ref=e373]: Jan 27, 2026 ·
+              - link "primary source ↗" [ref=e374] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115969943597305015
+          - generic [ref=e375]:
+            - generic [ref=e376]:
+              - generic [ref=e377]: Public statement · 2d after trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e378]: signal 85/100
+            - paragraph [ref=e379]: I have instructed Secretary of Homeland Security, Kristi Noem, that under no circumstances are we going to participate in various poorly run Democrat Cities with regard to their Protests and/or Riots unless, and until, they ask us for help.…
+            - generic [ref=e380]:
+              - generic [ref=e381]: "authority: 1.00"
+              - generic [ref=e382]: "corroboration: 1.00"
+              - generic [ref=e383]: "tradeMagnitude: 0.68"
+              - generic [ref=e384]: "entitySpecificity: 1.00"
+              - generic [ref=e385]: "temporalProximity: 0.87"
+              - generic [ref=e386]: "directionalConsistency: 0.50"
+            - generic [ref=e387]:
+              - generic [ref=e388]: Jan 30, 2026 ·
+              - link "primary source ↗" [ref=e389] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115991701359412321
+          - generic [ref=e390]:
+            - generic [ref=e391]:
+              - generic [ref=e392]: Public statement · 2d after trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e393]: signal 85/100
+            - paragraph [ref=e394]: I have instructed Secretary of Homeland Security, Kristi Noem, that under no circumstances are we going to participate in various poorly run Democrat Cities with regard to their Protests and/or Riots unless, and until, they ask us for help.…
+            - generic [ref=e395]:
+              - generic [ref=e396]: "authority: 1.00"
+              - generic [ref=e397]: "corroboration: 1.00"
+              - generic [ref=e398]: "tradeMagnitude: 0.68"
+              - generic [ref=e399]: "entitySpecificity: 1.00"
+              - generic [ref=e400]: "temporalProximity: 0.87"
+              - generic [ref=e401]: "directionalConsistency: 0.50"
+            - generic [ref=e402]:
+              - generic [ref=e403]: Jan 30, 2026 ·
+              - link "primary source ↗" [ref=e404] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115991701359412321
+          - generic [ref=e405]:
+            - generic [ref=e406]:
+              - generic [ref=e407]: Public statement · 2d after trade
+              - generic "Potential conflict signal — an analytical index, not a verdict" [ref=e408]: signal 85/100
+            - paragraph [ref=e409]: "Today is the day! To all Voters in Texas' 9th State Senate District: GET OUT AND VOTE for a phenomenal Candidate, Leigh Wambsganss. She is a highly successful Entrepreneur, and an incredible supporter of our Movement to, MAKE AMERICA GREAT …"
+            - generic [ref=e410]:
+              - generic [ref=e411]: "authority: 1.00"
+              - generic [ref=e412]: "corroboration: 1.00"
+              - generic [ref=e413]: "tradeMagnitude: 0.68"
+              - generic [ref=e414]: "entitySpecificity: 1.00"
+              - generic [ref=e415]: "temporalProximity: 0.87"
+              - generic [ref=e416]: "directionalConsistency: 0.50"
+            - generic [ref=e417]:
+              - generic [ref=e418]: Jan 30, 2026 ·
+              - link "primary source ↗" [ref=e419] [cursor=pointer]:
+                - /url: https://truthsocial.com/@realDonaldTrump/115991359481785479
+          - paragraph [ref=e420]:
+            - text: The signal score is a transparent analytical index (see
+            - link "methodology" [ref=e421] [cursor=pointer]:
+              - /url: /methodology
+            - text: ), not a finding of wrongdoing. Correlation is not causation.
+      - generic [ref=e422]:
+        - heading "Source" [level=2] [ref=e423]
+        - paragraph [ref=e424]: Row 2297 of the OGE Form 278-T filed May 7, 2026.
+        - generic [ref=e425]:
+          - link "View source PDF ↗" [ref=e426] [cursor=pointer]:
+            - /url: https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index/405E4EC4E27BE8D185258DF7002DD1C0/$FILE/Trump,%20Donald%20J.-05.08.2026-278T(2).pdf
+          - link "View filing" [ref=e427] [cursor=pointer]:
+            - /url: /filings/96d3eb74-8a6b-4ef2-8b53-e8efc97f4686
+      - paragraph [ref=e428]: Amount ranges are broad statutory bands, not exact figures. Transaction dates may precede the filing date by 30–45 days.
+  - contentinfo [ref=e429]:
+    - generic [ref=e430]:
+      - paragraph [ref=e431]:
+        - strong [ref=e432]: Disclosure Ledger
+        - text: "is a civic-transparency project. It compiles public records: securities transactions disclosed under the Ethics in Government Act and the STOCK Act, the President’s public statements, and official government actions. Disclosed amounts are statutory ranges, not exact figures. Timing correlations are presented as facts and transparently-scored signals —"
+        - emphasis [ref=e433]: not
+        - text: as findings of illegality. No evidence presented here establishes that any trade used nonpublic information; correlation is not causation; lawful trading is lawful.
+      - paragraph [ref=e434]: Project by Benjamin Life (@omniharmonic) · OpenCivics. Data used solely for news and transparency dissemination to the general public.
+  - alert [ref=e435]
