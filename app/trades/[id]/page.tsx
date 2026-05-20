@@ -46,7 +46,18 @@ export default async function TradeDetailPage({
         </Link>
         <div className="kicker mt-2">Disclosed transaction</div>
         <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight">
-          {t.ticker ? `${t.ticker} — ` : ""}
+          {t.ticker ? (
+            <>
+              <Link
+                href={`/companies/${encodeURIComponent(t.ticker)}`}
+                className="text-[var(--color-accent)] hover:underline"
+                title={t.companyName ? `View all ${t.companyName} trades` : "View company page"}
+              >
+                {t.ticker}
+              </Link>
+              {" — "}
+            </>
+          ) : null}
           {t.transactionType}
         </h1>
         <p className="mt-1 font-mono text-sm text-[var(--color-muted)]">{t.descriptionRaw}</p>

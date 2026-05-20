@@ -45,8 +45,10 @@ body {
   background-position: -1px -1px;
 }
 
-a {
-  color: inherit;
+@layer base {
+  a {
+    color: inherit;
+  }
 }
 
 .font-display {
