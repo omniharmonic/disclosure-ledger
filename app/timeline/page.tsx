@@ -11,7 +11,7 @@ export default async function TimelinePage() {
     <div className="space-y-6">
       <header className="rise max-w-2xl">
         <div className="kicker">Chronology</div>
-        <h1 className="mt-1 font-display text-4xl font-semibold tracking-tight">
+        <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
           The sequence of events
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-[var(--color-ink-soft)]">

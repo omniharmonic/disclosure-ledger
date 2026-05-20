@@ -56,13 +56,13 @@ export function CompaniesTable({ companies }: { companies: CompanyListItem[] }) 
   );
 
   const input =
-    "rounded border border-[var(--color-rule)] bg-[var(--color-card)] px-3 py-1.5 font-mono text-xs";
+    "w-full rounded border border-[var(--color-rule)] bg-[var(--color-card)] px-3 py-2 font-mono text-xs sm:w-auto sm:py-1.5";
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
         <input
-          className={input}
+          className={`${input} col-span-2 sm:col-auto`}
           placeholder="search ticker or company…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -86,7 +86,7 @@ export function CompaniesTable({ companies }: { companies: CompanyListItem[] }) 
           <option value="name">Sort: name (A–Z)</option>
           <option value="sector">Sort: sector</option>
         </select>
-        <span className="font-mono text-xs text-[var(--color-muted)]">
+        <span className="col-span-2 font-mono text-xs text-[var(--color-muted)] sm:col-auto">
           {rows.length} of {companies.length}
         </span>
       </div>

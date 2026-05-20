@@ -200,7 +200,7 @@ export function GraphExplorer({
               )}
             </div>
             {selected.detail && selected.detail !== selected.label && (
-              <p className="border-l-2 border-[var(--color-rule)] pl-2 text-xs leading-relaxed text-[var(--color-ink-soft)]">
+              <p className="border-l-2 border-[var(--color-rule)] pl-2 text-xs leading-relaxed break-words [overflow-wrap:anywhere] text-[var(--color-ink-soft)]">
                 {selected.detail}
                 {selected.detail.length >= 350 ? "…" : ""}
               </p>

@@ -11,7 +11,7 @@ function StatCard({ label, value, sub, i }: { label: string; value: string; sub?
       style={{ animationDelay: `${i * 70}ms` }}
     >
       <div className="kicker">{label}</div>
-      <div className="mt-1.5 font-display text-3xl font-semibold tabular leading-none tracking-tight">
+      <div className="mt-1.5 font-display text-2xl font-semibold tabular leading-none tracking-tight sm:text-3xl">
         {value}
       </div>
       {sub && <div className="mt-1 text-[0.7rem] text-[var(--color-muted)]">{sub}</div>}
@@ -32,7 +32,7 @@ export default async function HomePage() {
   return (
     <div className="space-y-14">
       <section className="rise max-w-4xl">
-        <div className="kicker">Office of Government Ethics · Form 278-T</div>
+        <div className="kicker">Independent watchdog oversight</div>
         <h1 className="mt-3 font-display text-3xl font-bold leading-[1.15] tracking-tight sm:text-[2.6rem]">
           A public record of presidential trading
           <span className="text-[var(--color-accent)]"> — and everything around it.</span>
@@ -99,7 +99,7 @@ export default async function HomePage() {
                   All trades →
                 </Link>
               </div>
-              <div className="mt-3 overflow-hidden rounded-lg border border-[var(--color-rule)]">
+              <div className="mt-3 overflow-x-auto rounded-lg border border-[var(--color-rule)]">
                 <table className="w-full border-collapse text-sm">
                   <tbody>
                     {recent.rows.map((t) => (

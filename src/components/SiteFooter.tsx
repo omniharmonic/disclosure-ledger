@@ -2,8 +2,8 @@ import Link from "next/link";
 
 export function SiteFooter() {
   return (
-    <footer className="mt-28 border-t-2 border-[var(--color-ink)] bg-[var(--color-paper-2)]">
-      <div className="mx-auto max-w-7xl px-6 py-12">
+    <footer className="mt-20 border-t-2 border-[var(--color-ink)] bg-[var(--color-paper-2)] sm:mt-28">
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-12">
         <div className="kicker">Standing disclaimer</div>
         <p className="mt-3 max-w-3xl font-display text-base leading-relaxed">
           This is a transparency record, not an accusation. It compiles public facts —

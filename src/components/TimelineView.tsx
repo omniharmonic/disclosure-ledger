@@ -97,17 +97,23 @@ export function TimelineView({ events }: { events: TimelineEvent[] }) {
                     return (
                       <button
                         key={e.id}
-                        className="absolute top-1.5 h-6 -translate-x-1/2 rounded-full transition-all hover:h-7 hover:top-1"
-                        style={{
-                          left: `${xOf(e.date)}%`,
-                          width: active ? 7 : 4,
-                          background: lane.color,
-                          opacity: active ? 1 : 0.62,
-                          outline: active ? "2px solid var(--color-ink)" : "none",
-                        }}
+                        className="group absolute top-0 flex h-9 w-5 -translate-x-1/2 items-center justify-center"
+                        style={{ left: `${xOf(e.date)}%` }}
                         onClick={() => setPinned(e)}
                         aria-label={`${e.kind} ${e.date}: ${e.label}`}
-                      />
+                      >
+                        <span
+                          className={`rounded-full transition-all group-hover:h-7 ${
+                            active ? "h-7" : "h-6"
+                          }`}
+                          style={{
+                            width: active ? 7 : 4,
+                            background: lane.color,
+                            opacity: active ? 1 : 0.62,
+                            outline: active ? "2px solid var(--color-ink)" : "none",
+                          }}
+                        />
+                      </button>
                     );
                   })}
               </div>
@@ -140,7 +146,9 @@ export function TimelineView({ events }: { events: TimelineEvent[] }) {
                 </Link>
               ))}
             </div>
-            <p className="mt-2 font-display text-base leading-snug">{pinned.detail}</p>
+            <p className="mt-2 font-display text-base leading-snug break-words [overflow-wrap:anywhere]">
+              {pinned.detail}
+            </p>
             <div className="mt-2 text-xs">
               {pinned.internal ? (
                 <Link href={pinned.href} className="font-medium text-[var(--color-accent)] hover:underline">

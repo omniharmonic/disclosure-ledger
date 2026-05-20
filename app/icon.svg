@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="6" fill="#16140f"/>
+  <!-- eye outline -->
+  <path d="M3.5 16C8 9 24 9 28.5 16C24 23 8 23 3.5 16Z" fill="none" stroke="#f2efe6" stroke-width="2.1"/>
+  <!-- rising stock chart in place of the iris -->
+  <polyline points="10 19 13.5 15 17 17 22 10.5" fill="none" stroke="#9c1f1f" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="22" cy="10.5" r="2.2" fill="#9c1f1f"/>
+</svg>

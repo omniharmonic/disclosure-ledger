@@ -12,7 +12,7 @@ export default async function FilingsPage() {
     <div className="space-y-6">
       <header className="rise">
         <div className="kicker">Source documents</div>
-        <h1 className="mt-1 font-display text-4xl font-semibold tracking-tight">Filings</h1>
+        <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight sm:text-4xl">Filings</h1>
         <p className="mt-2 text-sm text-[var(--color-ink-soft)]">
           Every OGE financial-disclosure filing ingested and parsed. Duplicates from the White
           House are superseded by the higher-quality OGE copy; filings under review are

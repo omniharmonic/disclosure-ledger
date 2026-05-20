@@ -15,7 +15,7 @@ export default async function CompaniesPage() {
     <div className="space-y-10">
       <header className="rise max-w-2xl">
         <div className="kicker">Resolved equity universe</div>
-        <h1 className="mt-1 font-display text-4xl font-semibold tracking-tight">
+        <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
           Companies in the disclosures
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-[var(--color-ink-soft)]">

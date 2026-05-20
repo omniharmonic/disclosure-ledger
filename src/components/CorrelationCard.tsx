@@ -63,7 +63,7 @@ export function CorrelationCard({ c }: { c: CorrelationCardData }) {
         </div>
       </div>
 
-      <p className="mt-3 font-display text-[1.05rem] leading-snug">
+      <p className="mt-3 font-display text-[1.05rem] leading-snug break-words [overflow-wrap:anywhere]">
         &ldquo;{c.eventTitle}
         {c.eventTitle.length >= 270 ? "…" : ""}&rdquo;
       </p>

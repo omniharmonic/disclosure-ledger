@@ -43,7 +43,7 @@ export default async function TradesPage({
     <div className="space-y-6">
       <header className="rise">
         <div className="kicker">Transaction register</div>
-        <h1 className="mt-1 font-display text-4xl font-semibold tracking-tight">
+        <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
           Disclosed trades
         </h1>
         <p className="mt-2 text-sm text-[var(--color-ink-soft)]">
@@ -76,7 +76,7 @@ export default async function TradesPage({
                 <tr key={t.id} className="border-b border-[var(--color-rule)] last:border-0 hover:bg-white">
                   <td className="px-3 py-2 tabular text-[var(--color-muted)]">{t.rowNumber}</td>
                   <td className="px-3 py-2 tabular whitespace-nowrap">{formatDate(t.transactionDate)}</td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2 whitespace-nowrap">
                     <Link href={`/trades/${t.id}`} className="hover:underline">
                       {t.ticker ? <span className="font-mono font-semibold">{t.ticker}</span> : null}{" "}
                       <span className={t.ticker ? "text-[var(--color-muted)]" : ""}>
