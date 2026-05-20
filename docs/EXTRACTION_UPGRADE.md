@@ -24,14 +24,23 @@ Recent fixes:
 The remaining ~15% `Unknown` types, and degraded `description` text, are limited
 by **Tesseract's OCR accuracy on poor scans** — the genuine ceiling.
 
-## 2. The upgrade: Surya OCR
+## 2. Surya OCR — ADOPTED
 
-Research (datalab-to/surya, ~20k stars — the OCR engine inside Marker and
-Docling) shows **Surya scores 0.97 vs Tesseract's 0.88** normalized text
-similarity on degraded scans. It is a modern transformer OCR built for exactly
-this failure mode (small fonts, degraded government forms). Swapping Tesseract
-→ Surya is the single highest-leverage extraction improvement and is expected
-to eliminate most remaining word-level garbling.
+The pipeline now OCRs every 278-T page with **Surya** (datalab-to/surya — the
+transformer OCR inside Marker and Docling), not Tesseract. `ocr_page` in
+`pipeline/extract_278t.py` renders each page at ~216 DPI and runs Surya's
+detection + recognition predictors (CPU, `TORCH_DEVICE=cpu`); results are
+cached per page in `data/cache/ocr/`.
+
+The difference is night-and-day on the degraded scans: on the worst filing,
+Tesseract produced unreadable noise ("ju __—weussancoacorsreassnssoomx") while
+Surya reads the actual rows — "CAPITAL ONE FINL CORP", "AMERICAN EXPRESS CO",
+clean dates and amount bands. `transformers` is pinned `<5` (Surya 0.17
+predates the 5.x breaking changes); `surya-ocr` also needs `requests`, which it
+fails to declare. Surya models (~1.3 GB) download once and are cached
+(`~/.cache/datalab`, `~/.cache/huggingface`) — the CI workflow caches them.
+
+### Original research (for reference)
 
 ### Constraints
 - CPU-only (no GPU on GitHub Actions runners or the dev Mac). Surya on CPU is

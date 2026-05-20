@@ -1,5 +1,10 @@
-# Python dependencies for the PDF extraction stage.
+# Python dependencies for the PDF extraction stage. Python 3.13.
 pdfplumber==0.11.4
 pypdfium2==4.30.0
-pytesseract==0.3.13
-Pillow==11.0.0
+# Surya OCR — transformer OCR, far more accurate than Tesseract on the
+# degraded 278-T scans. Replaces the former Tesseract pipeline.
+surya-ocr==0.17.1
+# Surya 0.17 predates transformers 5.x and breaks on it — pin to the 4.x line.
+transformers>=4.56.1,<5
+# Imported by Surya's S3 model downloader but not declared by surya-ocr.
+requests>=2.32

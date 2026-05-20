@@ -235,8 +235,34 @@ def parse_page(text, page_num, filing_year):
     return out
 
 
+# Surya OCR predictors are expensive to construct (multi-GB models) — build
+# them once per process and reuse across every page.
+_SURYA = None
+
+
+def _surya():
+    global _SURYA
+    if _SURYA is None:
+        import os  # noqa: PLC0415
+
+        # Force CPU — Surya has known Apple-MPS bugs, and CI runners are CPU-only.
+        os.environ.setdefault("TORCH_DEVICE", "cpu")
+        from surya.detection import DetectionPredictor  # noqa: PLC0415
+        from surya.foundation import FoundationPredictor  # noqa: PLC0415
+        from surya.recognition import RecognitionPredictor  # noqa: PLC0415
+
+        _SURYA = (RecognitionPredictor(FoundationPredictor()), DetectionPredictor())
+    return _SURYA
+
+
 def ocr_page(pdf_path, page_index):
-    """OCR one page, caching the result — OCR is the slow, deterministic step."""
+    """
+    OCR one page with Surya, caching the result.
+
+    Surya is a transformer OCR — far more accurate than Tesseract on the
+    degraded 278-T scans (it reads company names and digits Tesseract turns to
+    noise). OCR is the slow, deterministic step, so every page is cached.
+    """
     import os  # noqa: PLC0415
 
     cache_dir = os.path.join("data", "cache", "ocr")
@@ -248,14 +274,12 @@ def ocr_page(pdf_path, page_index):
             return fh.read()
 
     import pypdfium2 as pdfium  # noqa: PLC0415
-    import pytesseract  # noqa: PLC0415
 
     pdf = pdfium.PdfDocument(pdf_path)
-    img = pdf[page_index].render(scale=3.5).to_pil()
-    # PSM 4 ("single column of variable-size text") is the right model for
-    # these one-column transaction forms. PSM 6 ("uniform block") smears the
-    # table and loses ~98% of the digits.
-    text = pytesseract.image_to_string(img, config="--psm 4")
+    img = pdf[page_index].render(scale=3.0).to_pil()
+    rec, det = _surya()
+    result = rec([img], det_predictor=det, sort_lines=True)
+    text = "\n".join(line.text for line in result[0].text_lines)
     with open(cache_path, "w", encoding="utf-8") as fh:
         fh.write(text)
     return text
@@ -272,11 +296,9 @@ def extract(pdf_path, filing_iso=None):
     page_reports = []
 
     for idx, page in enumerate(pdf.pages):
-        embedded = page.extract_text() or ""
-        if len(embedded) > 400 and len(DATE_RE.findall(embedded)) >= 2:
-            text, source = embedded, "embedded"
-        else:
-            text, source = ocr_page(pdf_path, idx), "ocr"
+        # 278-T filings are scanned; any embedded text layer is itself a poor
+        # OCR pass. Always re-OCR with Surya — it is far more accurate.
+        text, source = ocr_page(pdf_path, idx), "ocr"
 
         m = PAGE_OF_RE.search(text)
         if m and declared_total is None:
