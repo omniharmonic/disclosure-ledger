@@ -36,9 +36,20 @@ export function PriceChart({
     );
   }
 
-  const markers = trades.filter(
-    (t) => t.priceAtTxn != null && prices.some((p) => p.date === t.date),
-  );
+  // Price history is weekly, so trade dates rarely land exactly on a data
+  // point — snap each marker to the nearest weekly date on the axis.
+  const markers = trades
+    .filter((t) => t.priceAtTxn != null)
+    .map((t) => {
+      const tTime = Date.parse(t.date);
+      let nearest = prices[0];
+      for (const p of prices) {
+        if (Math.abs(Date.parse(p.date) - tTime) < Math.abs(Date.parse(nearest.date) - tTime)) {
+          nearest = p;
+        }
+      }
+      return { date: nearest.date, type: t.type, priceAtTxn: t.priceAtTxn };
+    });
 
   return (
     <div className="rounded-lg border border-[var(--color-rule)] bg-[var(--color-card)] p-4">

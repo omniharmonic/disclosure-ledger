@@ -1,124 +1,159 @@
 /**
  * Stage 6b — Ingest stock prices.
  *
- * Fetches daily end-of-day price history for every resolved company ticker
- * from Stooq — a free, no-API-key CSV endpoint — into `price_cache`, then
- * stamps each transaction with the close price on (or just before) its
- * transaction date, the latest close, and a gain/loss percentage.
+ * Two free sources, each used for what its free tier allows:
+ *   • History (the chart): Alpha Vantage TIME_SERIES_WEEKLY — full weekly
+ *     history, free, but capped at 25 calls/day. Tickers are fetched in
+ *     correlation-priority order, ~24 per run, skipping any already cached —
+ *     so coverage fills in progressively over the daily pipeline runs.
+ *   • Current price: Finnhub /quote — 60 calls/min, no daily cap — refreshed
+ *     every run for every ticker that has cached history.
  *
- * EOD is sufficient: disclosed trades carry a date, not a timestamp.
+ * Requires ALPHAVANTAGE_API_KEY and FINNHUB_API_KEY. Without them the stage is
+ * a logged no-op and price-dependent UI degrades gracefully.
  */
 import { db } from "@/db";
-import { companies, transactions, filings, priceCache } from "@/db/schema";
+import { companies, transactions, filings, priceCache, correlations } from "@/db/schema";
 import { and, eq, inArray, isNotNull, sql, desc, lte } from "drizzle-orm";
 import { fetchJson } from "../lib/http";
 
-/**
- * Price source. Financial Modeling Prep (free tier — instant key, 250
- * calls/day, ample for ~40 tickers) is the reliable path; Yahoo Finance's
- * keyless endpoint is a best-effort fallback (it rate-limits aggressively).
- * Set FMP_API_KEY to populate prices reliably.
- */
-const FMP_KEY = process.env.FMP_API_KEY ?? "";
-const YF_UA =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+const ALPHA_KEY = process.env.ALPHAVANTAGE_API_KEY ?? "";
+const FINNHUB_KEY = process.env.FINNHUB_API_KEY ?? "";
+/** Alpha Vantage free tier hard cap is 25 requests/day. */
+const HISTORY_BUDGET = 24;
 
 interface PriceRow {
   date: string;
   close: number;
 }
 
-interface FmpHistory {
-  historical?: { date: string; close: number }[];
+interface AvWeekly {
+  "Weekly Time Series"?: Record<string, { "4. close": string }>;
+  Information?: string;
+  Note?: string;
 }
 
-function parseFmp(json: FmpHistory): PriceRow[] {
-  return (json.historical ?? [])
-    .filter((h) => /^\d{4}-\d{2}-\d{2}$/.test(h.date) && Number.isFinite(h.close) && h.close > 0)
-    .map((h) => ({ date: h.date, close: Math.round(h.close * 100) / 100 }));
+interface FinnhubQuote {
+  c?: number; // current price
 }
 
-interface YahooChart {
-  chart?: {
-    result?: {
-      timestamp?: number[];
-      indicators?: { quote?: { close?: (number | null)[] }[] };
-    }[];
-  };
-}
-
-/** Fetch daily EOD history for a ticker — FMP when keyed, else Yahoo. */
-async function fetchPriceHistory(ticker: string): Promise<PriceRow[]> {
-  const t = encodeURIComponent(ticker.trim().toUpperCase());
-  if (FMP_KEY) {
-    const url = `https://financialmodelingprep.com/api/v3/historical-price-full/${t}?from=2024-01-01&apikey=${FMP_KEY}`;
-    return parseFmp(await fetchJson<FmpHistory>(url, { retries: 2, timeoutMs: 30_000 }));
-  }
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${t}?range=2y&interval=1d`;
-  return parseYahoo(
-    await fetchJson<YahooChart>(url, { retries: 2, timeoutMs: 30_000, userAgent: YF_UA }),
-  );
-}
-
-function parseYahoo(json: YahooChart): PriceRow[] {
-  const r = json.chart?.result?.[0];
-  const ts = r?.timestamp ?? [];
-  const closes = r?.indicators?.quote?.[0]?.close ?? [];
+function parseAvWeekly(json: AvWeekly): PriceRow[] {
+  const series = json["Weekly Time Series"];
+  if (!series) return [];
   const rows: PriceRow[] = [];
-  for (let i = 0; i < ts.length; i++) {
-    const close = closes[i];
-    if (close == null || !Number.isFinite(close) || close <= 0) continue;
-    const date = new Date(ts[i] * 1000).toISOString().slice(0, 10);
-    rows.push({ date, close: Math.round(close * 100) / 100 });
+  for (const [date, v] of Object.entries(series)) {
+    const close = Number(v["4. close"]);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(close) && close > 0) {
+      // Only keep history relevant to the disclosure window.
+      if (date >= "2024-06-01") rows.push({ date, close: Math.round(close * 100) / 100 });
+    }
   }
-  return rows;
+  return rows.sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export interface PricesResult {
-  tickers: number;
+  historyFetched: number;
   pricePoints: number;
+  currentRefreshed: number;
   transactionsPriced: number;
   errors: string[];
 }
 
 export async function ingestPrices(): Promise<PricesResult> {
-  const result: PricesResult = { tickers: 0, pricePoints: 0, transactionsPriced: 0, errors: [] };
+  const result: PricesResult = {
+    historyFetched: 0,
+    pricePoints: 0,
+    currentRefreshed: 0,
+    transactionsPriced: 0,
+    errors: [],
+  };
+  if (!ALPHA_KEY && !FINNHUB_KEY) {
+    console.log("[ingest-prices] skipped — no ALPHAVANTAGE_API_KEY / FINNHUB_API_KEY");
+    return result;
+  }
 
+  // Tickers in the dataset, correlation-priority order.
   const tickerRows = await db
-    .selectDistinct({ ticker: companies.ticker })
+    .select({
+      ticker: companies.ticker,
+      corr: sql<number>`count(distinct ${correlations.id})`,
+    })
     .from(companies)
     .innerJoin(transactions, eq(transactions.companyId, companies.id))
     .innerJoin(filings, eq(transactions.filingId, filings.id))
-    .where(and(isNotNull(companies.ticker), inArray(filings.status, ["parsed", "published"])));
+    .leftJoin(correlations, eq(correlations.transactionId, transactions.id))
+    .where(and(isNotNull(companies.ticker), inArray(filings.status, ["parsed", "published"])))
+    .groupBy(companies.ticker)
+    .orderBy(desc(sql`count(distinct ${correlations.id})`));
+  const tickers = tickerRows.map((r) => r.ticker!).filter(Boolean);
 
-  for (const { ticker } of tickerRows) {
-    if (!ticker) continue;
-    try {
-      const rows = await fetchPriceHistory(ticker);
-      if (rows.length === 0) {
-        result.errors.push(`${ticker}: no price data`);
-        continue;
-      }
-      for (let i = 0; i < rows.length; i += 500) {
+  // --- history pass (Alpha Vantage weekly, budget-limited) ----------------
+  const cached = new Set(
+    (await db.selectDistinct({ t: priceCache.ticker }).from(priceCache)).map((r) => r.t),
+  );
+  if (ALPHA_KEY) {
+    let budget = HISTORY_BUDGET;
+    for (const ticker of tickers) {
+      if (budget <= 0) break;
+      if (cached.has(ticker)) continue;
+      budget--;
+      try {
+        const json = await fetchJson<AvWeekly>(
+          `https://www.alphavantage.co/query?function=TIME_SERIES_WEEKLY&symbol=${encodeURIComponent(ticker)}&apikey=${ALPHA_KEY}`,
+          { retries: 1, timeoutMs: 25_000 },
+        );
+        if (json.Information || json.Note) {
+          result.errors.push(`Alpha Vantage rate limit reached at ${ticker}`);
+          break; // daily cap hit — stop, the rest fill in tomorrow
+        }
+        const rows = parseAvWeekly(json);
+        if (rows.length === 0) {
+          result.errors.push(`${ticker}: no weekly data`);
+          continue;
+        }
         await db
           .insert(priceCache)
-          .values(
-            rows.slice(i, i + 500).map((r) => ({
-              ticker,
-              priceDate: r.date,
-              closePrice: r.close,
-            })),
-          )
+          .values(rows.map((r) => ({ ticker, priceDate: r.date, closePrice: r.close })))
           .onConflictDoNothing({ target: [priceCache.ticker, priceCache.priceDate] });
+        result.historyFetched++;
+        result.pricePoints += rows.length;
+        cached.add(ticker);
+      } catch (err) {
+        result.errors.push(`${ticker}: ${String(err)}`);
       }
-      result.tickers++;
-      result.pricePoints += rows.length;
-    } catch (err) {
-      result.errors.push(`${ticker}: ${String(err)}`);
     }
   }
 
-  // Stamp transactions with price-at-trade, latest price, and gain/loss.
+  // --- current-price pass (Finnhub quote, tickers that have history) ------
+  const currentByTicker = new Map<string, number>();
+  if (FINNHUB_KEY) {
+    for (const ticker of tickers) {
+      if (!cached.has(ticker)) continue;
+      try {
+        const q = await fetchJson<FinnhubQuote>(
+          `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(ticker)}&token=${FINNHUB_KEY}`,
+          { retries: 1, timeoutMs: 15_000 },
+        );
+        if (q.c && q.c > 0) {
+          currentByTicker.set(ticker, Math.round(q.c * 100) / 100);
+          result.currentRefreshed++;
+          // Record today's quote in the cache so the chart ends at "now".
+          await db
+            .insert(priceCache)
+            .values({
+              ticker,
+              priceDate: new Date().toISOString().slice(0, 10),
+              closePrice: q.c,
+            })
+            .onConflictDoNothing({ target: [priceCache.ticker, priceCache.priceDate] });
+        }
+      } catch (err) {
+        result.errors.push(`${ticker} quote: ${String(err)}`);
+      }
+    }
+  }
+
+  // --- stamp transactions -------------------------------------------------
   const txns = await db
     .select({
       id: transactions.id,
@@ -131,38 +166,42 @@ export async function ingestPrices(): Promise<PricesResult> {
     .where(and(isNotNull(companies.ticker), inArray(filings.status, ["parsed", "published"])));
 
   for (const t of txns) {
-    if (!t.ticker) continue;
-    // close on or just before the transaction date
+    if (!t.ticker || !cached.has(t.ticker)) continue;
     const at = await db
       .select({ close: priceCache.closePrice })
       .from(priceCache)
       .where(and(eq(priceCache.ticker, t.ticker), lte(priceCache.priceDate, t.date)))
       .orderBy(desc(priceCache.priceDate))
       .limit(1);
-    const latest = await db
-      .select({ close: priceCache.closePrice, d: priceCache.priceDate })
-      .from(priceCache)
-      .where(eq(priceCache.ticker, t.ticker))
-      .orderBy(desc(priceCache.priceDate))
-      .limit(1);
-    if (!at[0] || !latest[0]) continue;
+    if (!at[0]) continue;
     const priceAt = at[0].close;
-    const priceNow = latest[0].close;
+    const priceNow =
+      currentByTicker.get(t.ticker) ??
+      (
+        await db
+          .select({ close: priceCache.closePrice })
+          .from(priceCache)
+          .where(eq(priceCache.ticker, t.ticker))
+          .orderBy(desc(priceCache.priceDate))
+          .limit(1)
+      )[0]?.close;
+    if (!priceNow) continue;
     await db
       .update(transactions)
       .set({
         priceAtTxn: priceAt,
         priceCurrent: priceNow,
-        priceCurrentDate: latest[0].d,
-        gainLossPct: priceAt > 0 ? Math.round(((priceNow - priceAt) / priceAt) * 1000) / 10 : null,
+        priceCurrentDate: new Date().toISOString().slice(0, 10),
+        gainLossPct:
+          priceAt > 0 ? Math.round(((priceNow - priceAt) / priceAt) * 1000) / 10 : null,
       })
       .where(eq(transactions.id, t.id));
     result.transactionsPriced++;
   }
 
   console.log(
-    `[ingest-prices] ${result.tickers} tickers, ${result.pricePoints} price points, ` +
-      `${result.transactionsPriced} transactions priced`,
+    `[ingest-prices] ${result.historyFetched} ticker histories (+${result.pricePoints} points), ` +
+      `${result.currentRefreshed} current quotes, ${result.transactionsPriced} transactions priced`,
   );
   return result;
 }
