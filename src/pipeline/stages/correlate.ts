@@ -19,7 +19,7 @@ import {
   actionTargets,
   correlations,
 } from "@/db/schema";
-import { and, eq, gte, lte, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, eq, gte, lte, lt, inArray, isNotNull, sql } from "drizzle-orm";
 import { bandMidpoint } from "@/lib/bands";
 
 export const SCORING_VERSION = "1.0";
@@ -85,9 +85,16 @@ export interface CorrelateResult {
   trades: number;
 }
 
-/** Build correlations for all resolved trades in public filings. */
+/**
+ * Build correlations for all resolved trades in public filings.
+ *
+ * Re-scoring is an UPSERT keyed on the (trade, event) pair — never a
+ * truncate-and-rebuild — so `verified_genuine` / `verdict_reason` survive
+ * every run (FR-O2). Pairs the run no longer produces (window/threshold
+ * change, event removed) are pruned by their stale `refreshed_at` stamp.
+ */
 export async function correlate(): Promise<CorrelateResult> {
-  await db.delete(correlations);
+  const runStarted = new Date();
 
   const trades = await db
     .select({
@@ -110,9 +117,12 @@ export async function correlate(): Promise<CorrelateResult> {
     const to = addDays(t.date, WINDOW_AFTER_DAYS);
     let matched = false;
 
-    // Candidate statements mentioning the company in-window.
+    // Candidate statements mentioning the company in-window. DISTINCT on the
+    // statement: a statement that mentions the company several times ("Nvidia
+    // … $NVDA") is ONE event, not several — multiple spans previously created
+    // duplicate correlation rows for the same (trade, statement) pair.
     const stmts = await db
-      .select({ id: statements.id, date: statements.spokenAt })
+      .selectDistinctOn([statements.id], { id: statements.id, date: statements.spokenAt })
       .from(statementMentions)
       .innerJoin(statements, eq(statementMentions.statementId, statements.id))
       .where(
@@ -121,11 +131,13 @@ export async function correlate(): Promise<CorrelateResult> {
           gte(statements.spokenAt, from),
           lte(statements.spokenAt, to),
         ),
-      );
+      )
+      .orderBy(statements.id);
 
-    // Candidate actions affecting the company in-window.
+    // Candidate actions affecting the company in-window (DISTINCT for the
+    // same reason).
     const acts = await db
-      .select({ id: actions.id, date: actions.occurredOn })
+      .selectDistinctOn([actions.id], { id: actions.id, date: actions.occurredOn })
       .from(actionTargets)
       .innerJoin(actions, eq(actionTargets.actionId, actions.id))
       .where(
@@ -134,7 +146,8 @@ export async function correlate(): Promise<CorrelateResult> {
           gte(actions.occurredOn, from),
           lte(actions.occurredOn, to),
         ),
-      );
+      )
+      .orderBy(actions.id);
 
     const events: { kind: "statement" | "action"; id: string; date: string }[] = [
       ...stmts.map((s) => ({ kind: "statement" as const, id: s.id, date: s.date })),
@@ -160,24 +173,52 @@ export async function correlate(): Promise<CorrelateResult> {
       .slice(0, MAX_PER_TRADE);
 
     for (const s of scored) {
-      await db.insert(correlations).values({
-        transactionId: t.id,
-        eventKind: s.ev.kind,
-        statementId: s.ev.kind === "statement" ? s.ev.id : null,
-        actionId: s.ev.kind === "action" ? s.ev.id : null,
-        daysGap: s.gap,
-        signalScore: s.signal,
-        components: s.components,
-        scoringVersion: SCORING_VERSION,
-      });
+      await db
+        .insert(correlations)
+        .values({
+          transactionId: t.id,
+          eventKind: s.ev.kind,
+          statementId: s.ev.kind === "statement" ? s.ev.id : null,
+          actionId: s.ev.kind === "action" ? s.ev.id : null,
+          daysGap: s.gap,
+          signalScore: s.signal,
+          components: s.components,
+          scoringVersion: SCORING_VERSION,
+          refreshedAt: runStarted,
+        })
+        .onConflictDoUpdate({
+          target: [
+            correlations.transactionId,
+            correlations.eventKind,
+            correlations.statementId,
+            correlations.actionId,
+          ],
+          set: {
+            daysGap: s.gap,
+            signalScore: s.signal,
+            components: s.components,
+            scoringVersion: SCORING_VERSION,
+            refreshedAt: runStarted,
+            // verifiedGenuine / verdictReason deliberately untouched — the
+            // verify stage's (and any human reviewer's) verdicts persist.
+          },
+        });
       result.pairs++;
       matched = true;
     }
     if (matched) result.trades++;
   }
 
+  // Prune pairs this run no longer produced (event removed, window or
+  // threshold change). Everything still valid carries the fresh stamp.
+  const pruned = await db
+    .delete(correlations)
+    .where(lt(correlations.refreshedAt, runStarted))
+    .returning({ id: correlations.id });
+
   console.log(
-    `[correlate] ${result.pairs} correlations across ${result.trades} trades`,
+    `[correlate] ${result.pairs} correlations across ${result.trades} trades` +
+      (pruned.length ? `, ${pruned.length} stale pruned` : ""),
   );
   return result;
 }

@@ -6,32 +6,23 @@
  */
 import type { NextRequest } from "next/server";
 import { listTransactions } from "@/lib/queries";
-import { apiOk, apiError, pagination } from "@/lib/api";
+import { apiOk, apiServerError, parseQuery, transactionsQuery } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const url = new URL(req.url);
-  const { page, limit } = pagination(url);
-  const sortBy = url.searchParams.get("sortBy");
-  const order = url.searchParams.get("order");
+  const parsed = parseQuery(new URL(req.url), transactionsQuery);
+  if (!parsed.ok) return parsed.response;
+  const q = parsed.params;
 
   try {
-    const { rows, total } = await listTransactions({
-      search: url.searchParams.get("search") ?? undefined,
-      type: url.searchParams.get("type") ?? undefined,
-      dateFrom: url.searchParams.get("dateFrom") ?? undefined,
-      dateTo: url.searchParams.get("dateTo") ?? undefined,
-      bandMin: url.searchParams.get("bandMin")
-        ? Number(url.searchParams.get("bandMin"))
-        : undefined,
-      sortBy: sortBy === "amount" || sortBy === "description" ? sortBy : "date",
-      order: order === "asc" ? "asc" : "desc",
-      page,
-      limit,
+    const { rows, total } = await listTransactions(q);
+    return apiOk(rows, {
+      total,
+      page: q.page,
+      totalPages: Math.ceil(total / q.limit),
     });
-    return apiOk(rows, { total, page, totalPages: Math.ceil(total / limit) });
   } catch (err) {
-    return apiError(`query failed: ${String(err)}`, 500);
+    return apiServerError("transactions", err);
   }
 }

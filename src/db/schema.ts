@@ -21,6 +21,7 @@ import {
   bigserial,
   index,
   uniqueIndex,
+  unique,
 } from "drizzle-orm/pg-core";
 
 /** People / filers — extensible beyond the President. */
@@ -235,11 +236,19 @@ export const correlations = pgTable(
     // LLM reasoning verification (production pipeline; null = unverified).
     verifiedGenuine: boolean("verified_genuine"),
     verdictReason: text("verdict_reason"),
+    // Stamped on every correlate run that re-scores this pair; rows the run
+    // did not touch are pruned. Lets re-scoring preserve verdicts (FR-O2).
+    refreshedAt: timestamp("refreshed_at", { withTimezone: true }).defaultNow().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
     index("idx_corr_txn").on(t.transactionId),
     index("idx_corr_score").on(t.signalScore),
+    // One correlation per (trade, event) pair. NULLS NOT DISTINCT so the
+    // unused statement/action column cannot create duplicate pairs (PG ≥ 15).
+    unique("uq_corr_pair")
+      .on(t.transactionId, t.eventKind, t.statementId, t.actionId)
+      .nullsNotDistinct(),
   ],
 );
 

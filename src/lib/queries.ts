@@ -23,6 +23,15 @@ import { and, or, eq, gte, lte, ilike, desc, asc, sql, inArray, count } from "dr
 
 export const PUBLIC_FILING_STATUSES = ["parsed", "published"] as const;
 
+/**
+ * Guard for user-supplied ids. Postgres throws (→ HTTP 500) on a malformed
+ * uuid cast; validating the shape first turns garbage input into a clean 404.
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function isUuid(id: string): boolean {
+  return UUID_RE.test(id);
+}
+
 export interface TransactionFilter {
   search?: string;
   type?: string;
@@ -118,8 +127,13 @@ export async function listTransactions(
   return { rows: rows as TransactionRow[], total };
 }
 
-/** A single transaction with its filing context. */
+/**
+ * A single transaction with its filing context. Only rows from publicly
+ * released filings are returned — a `review`/`pending`/`superseded` filing's
+ * rows must not be readable even by direct URL (PRD NFR "Accuracy", FR-O3).
+ */
 export async function getTransaction(id: string): Promise<TransactionRow | null> {
+  if (!isUuid(id)) return null;
   const rows = await db
     .select({
       id: transactions.id,
@@ -141,7 +155,9 @@ export async function getTransaction(id: string): Promise<TransactionRow | null>
     .from(transactions)
     .innerJoin(filings, eq(transactions.filingId, filings.id))
     .leftJoin(companies, eq(transactions.companyId, companies.id))
-    .where(eq(transactions.id, id))
+    .where(
+      and(eq(transactions.id, id), inArray(filings.status, [...PUBLIC_FILING_STATUSES])),
+    )
     .limit(1);
   return (rows[0] as TransactionRow) ?? null;
 }
@@ -155,9 +171,14 @@ export async function listFilings() {
     .orderBy(desc(filings.filingDate));
 }
 
-/** One filing plus its transactions. */
+/** One publicly-released filing plus its transactions. */
 export async function getFiling(id: string) {
-  const [filing] = await db.select().from(filings).where(eq(filings.id, id)).limit(1);
+  if (!isUuid(id)) return null;
+  const [filing] = await db
+    .select()
+    .from(filings)
+    .where(and(eq(filings.id, id), inArray(filings.status, [...PUBLIC_FILING_STATUSES])))
+    .limit(1);
   if (!filing) return null;
   const txns = await db
     .select()
@@ -298,11 +319,13 @@ export async function getCompany(ticker: string) {
     })
     .from(correlations)
     .innerJoin(transactions, eq(correlations.transactionId, transactions.id))
+    .innerJoin(filings, eq(transactions.filingId, filings.id))
     .leftJoin(statements, eq(correlations.statementId, statements.id))
     .leftJoin(actions, eq(correlations.actionId, actions.id))
     .where(
       and(
         eq(transactions.companyId, company.id),
+        inArray(filings.status, [...PUBLIC_FILING_STATUSES]),
         sql`${correlations.verifiedGenuine} is not false`,
       ),
     )
@@ -342,8 +365,9 @@ export interface CorrelationView {
   eventUrl: string;
 }
 
-/** Correlations for one transaction, highest signal first. */
+/** Correlations for one transaction in a public filing, highest signal first. */
 export async function getCorrelations(transactionId: string): Promise<CorrelationView[]> {
+  if (!isUuid(transactionId)) return [];
   const rows = await db
     .select({
       id: correlations.id,
@@ -359,11 +383,14 @@ export async function getCorrelations(transactionId: string): Promise<Correlatio
       actionUrl: actions.sourceUrl,
     })
     .from(correlations)
+    .innerJoin(transactions, eq(correlations.transactionId, transactions.id))
+    .innerJoin(filings, eq(transactions.filingId, filings.id))
     .leftJoin(statements, eq(correlations.statementId, statements.id))
     .leftJoin(actions, eq(correlations.actionId, actions.id))
     .where(
       and(
         eq(correlations.transactionId, transactionId),
+        inArray(filings.status, [...PUBLIC_FILING_STATUSES]),
         // hide correlations the reasoning stage flagged as string coincidences
         sql`${correlations.verifiedGenuine} is not false`,
       ),
@@ -545,10 +572,16 @@ export async function getTimelineEvents(limit = 600): Promise<TimelineEvent[]> {
     })
     .from(correlations)
     .innerJoin(transactions, eq(correlations.transactionId, transactions.id))
+    .innerJoin(filings, eq(transactions.filingId, filings.id))
     .leftJoin(companies, eq(transactions.companyId, companies.id))
     .leftJoin(statements, eq(correlations.statementId, statements.id))
     .leftJoin(actions, eq(correlations.actionId, actions.id))
-    .where(sql`${correlations.verifiedGenuine} is not false`);
+    .where(
+      and(
+        inArray(filings.status, [...PUBLIC_FILING_STATUSES]),
+        sql`${correlations.verifiedGenuine} is not false`,
+      ),
+    );
 
   type Rel = { label: string; signal: number; href: string };
   const byTrade = new Map<string, Rel[]>();

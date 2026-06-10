@@ -17,6 +17,16 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/**
+ * Strip credential-bearing query parameters before a URL reaches any error
+ * message or log line. Pipeline errors are persisted to `ingestion_runs` and
+ * printed to GitHub Actions logs — which are world-readable on a public repo —
+ * so a raw failing URL would publish the API key it carries.
+ */
+export function redactUrl(s: string): string {
+  return s.replace(/([?&](?:api_?key|apikey|token|key|access_token)=)[^&\s"']+/gi, "$1***");
+}
+
 async function throttle(url: string): Promise<void> {
   const host = new URL(url).host;
   const last = lastHit.get(host) ?? 0;
@@ -51,7 +61,7 @@ export async function politeFetch(url: string, opts: FetchOptions = {}): Promise
       });
       clearTimeout(timer);
       if (res.status === 429 || res.status >= 500) {
-        throw new Error(`HTTP ${res.status} from ${url}`);
+        throw new Error(`HTTP ${res.status} from ${redactUrl(url)}`);
       }
       return res;
     } catch (err) {
@@ -59,26 +69,28 @@ export async function politeFetch(url: string, opts: FetchOptions = {}): Promise
       if (attempt < retries) await sleep(2_000 * (attempt + 1));
     }
   }
-  throw new Error(`politeFetch failed after ${retries + 1} attempts: ${String(lastErr)}`);
+  throw new Error(
+    `politeFetch failed after ${retries + 1} attempts for ${redactUrl(url)}: ${redactUrl(String(lastErr))}`,
+  );
 }
 
 /** Fetch JSON from a polite request. */
 export async function fetchJson<T = unknown>(url: string, opts?: FetchOptions): Promise<T> {
   const res = await politeFetch(url, { accept: "application/json", ...opts });
-  if (!res.ok) throw new Error(`HTTP ${res.status} fetching JSON from ${url}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} fetching JSON from ${redactUrl(url)}`);
   return (await res.json()) as T;
 }
 
 /** Fetch text from a polite request. */
 export async function fetchText(url: string, opts?: FetchOptions): Promise<string> {
   const res = await politeFetch(url, opts);
-  if (!res.ok) throw new Error(`HTTP ${res.status} fetching text from ${url}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} fetching text from ${redactUrl(url)}`);
   return res.text();
 }
 
 /** Fetch raw bytes (for PDFs). */
 export async function fetchBytes(url: string, opts?: FetchOptions): Promise<Buffer> {
   const res = await politeFetch(url, opts);
-  if (!res.ok) throw new Error(`HTTP ${res.status} fetching bytes from ${url}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} fetching bytes from ${redactUrl(url)}`);
   return Buffer.from(await res.arrayBuffer());
 }

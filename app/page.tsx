@@ -57,7 +57,7 @@ export default async function HomePage() {
           <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatCard i={0} label="Transactions" value={stats.totalTransactions.toLocaleString()} sub="from released filings" />
             <StatCard i={1} label="Estimated value" value={`${formatDollars(stats.estimatedValueMin)}–${formatDollars(stats.estimatedValueMax)}`} sub="sum of statutory bands" />
-            <StatCard i={2} label="Date coverage" value={stats.earliestDate ? `${new Date(stats.earliestDate).getFullYear()}–${new Date(stats.latestDate!).getFullYear()}` : "—"} sub={stats.earliestDate ? `${formatDate(stats.earliestDate)} – ${formatDate(stats.latestDate)}` : undefined} />
+            <StatCard i={2} label="Date coverage" value={stats.earliestDate ? `${stats.earliestDate.slice(0, 4)}–${stats.latestDate!.slice(0, 4)}` : "—"} sub={stats.earliestDate ? `${formatDate(stats.earliestDate)} – ${formatDate(stats.latestDate)}` : undefined} />
             <StatCard i={3} label="Filings" value={String(stats.totalFilings)} sub={stats.lastFilingDate ? `last ${formatDate(stats.lastFilingDate)}` : undefined} />
           </section>
 
