@@ -586,3 +586,51 @@ The bones are excellent. The work ahead is converting *asserted* rigor into *dem
 rigor, fixing the four trust defects that live testing surfaced, and finishing the load-bearing
 features (reconciliation, real scoring, authoritative statements, the open API) that the PRD
 treats as the entire point.
+
+---
+
+## Appendix — Remediation record (June 2026)
+
+Every item above was addressed in the commit series following this document. Status key:
+✅ implemented & verified · 🟨 implemented as the honest first step (full version documented).
+
+| Item | Status | Where |
+|---|---|---|
+| D1 withheld-row leak | ✅ status gate + UUID guard in every detail query; HTTP-verified 404; regression tests | `fix: P0 trust defects` |
+| D2 verdict wipe | ✅ upsert on `uq_corr_pair` (NULLS NOT DISTINCT) + `refreshed_at` prune; verdict-preservation test | same |
+| D3 duplicate correlations | ✅ DISTINCT candidates per event; idempotency test | same |
+| D4 secrets in CI logs | ✅ `redactUrl()` on every pipeline error path + tests (operator should still rotate previously-exposed keys) | same |
+| D5 error leakage / 500s | ✅ zod-validated params (the formerly unused dependency), generic 500s, 404 on bad ids | same |
+| Timezone date bug | ✅ UTC-pinned `formatDate`; CI runs the suite under `TZ=America/Denver` | same |
+| §6.2 scoring honesty | ✅ v1.1: placeholder component removed, entitySpecificity varies (1.0/0.6), per-filer `authority`; weights/definitions/changelog rendered from `src/lib/scoring.ts` | `feat: honest correlation scoring v1.1` |
+| §6.3 sector dimension | ✅ sub-industry topic gazetteer → `statement_mentions.sector` / `action_targets.sector` → topic-tier candidates | same |
+| W-15 methodology drift | ✅ weights table from source, price-source corrected, changelog added; ARCHITECTURE §4/§6 rewritten to the implemented design | same |
+| FR-API1–5 open data | ✅ 12 endpoints incl. statements/actions/correlations/companies, streamed NDJSON+CSV export, OpenAPI 3.1 at `/api/v1/openapi.json`, `/api-docs` rendered from the spec | `feat: complete the open-data API` |
+| S-1 auth + rate limiting | ✅ SHA-256 key auth (401 on bad key), per-subject daily counters (`api_usage`), X-RateLimit headers, verified 429 | same |
+| S-2 read-only role | ✅ `dbRo` (`DATABASE_URL_RO`) for all public queries; rate counter is the single serving-tier write | same |
+| FR-T8 reconciliation | 🟨 source-agnostic NDJSON engine + `reconciled_sources` surfaced on trade detail; operator supplies the ProPublica snapshot via `RECONCILE_DATA_*` | `feat: pipeline robustness` |
+| G2 statement sources | 🟨 govinfo CPD ingester (authoritative source; multi-speaker categories deferred to a segmentation layer rather than risk misattribution); APP scraper remains future work | same |
+| FR-A2 USAspending | ✅ contract awards → `contract` actions + `contract_recipient` targets with fuzzy-match rejection | same |
+| W-10 stage isolation | ✅ per-stage failure domains in `run.ts all`; non-zero exit preserved for alerting | same |
+| W-13 statements-as-actions | ✅ WH remarks → `statements`; remaining WH items labelled "Administration communication" in the UI | same + frontend commit |
+| FR-T3 signatures | 🟨 PKCS#7 *presence* detected and recorded (`signature_present`); cryptographic chain verification still deferred and never implied | same |
+| W-9 provenance durability | 🟨 raw PDFs uploaded as 90-day CI artifacts every run; durable object storage remains the recommended end state | same |
+| FR-O4 alerting | ✅ pipeline failure opens a labelled repo issue | same |
+| FR-W1 dashboard modules | ✅ top holdings (as ranges), sector concentration, gain/loss leaders | `feat: frontend completion` |
+| W-6 timeline determinism | ✅ most-recent-mentioned selection + lane filters + correlated-only toggle | same |
+| W-18 accessibility | ✅ AA-passing muted (#6e6557, 5.0:1), table equivalents for timeline & graph, skip link, region labels | same |
+| W-16 ISR + revalidate | ✅ ISR on read pages; `/api/revalidate` (the endpoint `pipeline.yml` already called) | same |
+| W-7 graph payload | 🟨 label loads bounded to graph-referenced ids; full lazy-expansion neighborhood API remains future work | same |
+| FR-O3 review queue | ✅ `/admin/review` (Basic Auth, off unless `ADMIN_PASSWORD` set) with publish/withhold actions | same |
+| FR-C5 disclosure framing | ✅ disclosure-lag fact on trade detail | pipeline commit |
+| SEO / errors / headers | ✅ sitemap, robots, JSON-LD Dataset, branded 404/error/loading, CSP + HSTS + frame-deny | frontend commit |
+| S-5 migrations | ✅ committed baseline + `db:migrate` runner (verified against a fresh DB) | cleanup commit |
+| §9 testing | ✅ 49 tests: gazetteer precision firewall, scoring invariants, topics, reconcile matcher, redaction, dates, D1/D2/D3 DB regressions; CI workflow runs all of it + build against Postgres 16 with TZ pinned west of UTC | throughout + cleanup |
+| Cleanup inventory | ✅ `zod` wired, `Placeholder.tsx` removed, `db:migrate` real, typedRoutes enabled, deferred columns annotated, LICENSE (MIT) added, README rewritten | cleanup commit |
+
+**Still open (documented, deliberately not faked):** full PKCS#7 chain verification (FR-T3);
+American Presidency Project scraper and the caption/speaker-segmentation layer (FR-S1
+priorities 1/5, FR-S3); CPD-upgrades-faster-source reconciliation (FR-S6); LLM mention layer
+with sentiment/stance (FR-S4 beyond gazetteer); directional-consistency modelling (returns to
+the score when price-impact direction exists); graph lazy-expansion API; durable object
+storage for PDFs; OGE `PAS+Index` polling for the future Cabinet expansion.

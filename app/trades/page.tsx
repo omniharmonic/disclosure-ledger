@@ -33,10 +33,10 @@ export default async function TradesPage({
   const totalPages = Math.max(1, Math.ceil(total / 50));
 
   const buildPageUrl = (p: number) => {
-    const next = new URLSearchParams();
-    for (const [k, v] of Object.entries(sp)) if (typeof v === "string") next.set(k, v);
-    next.set("page", String(p));
-    return `/trades?${next.toString()}`;
+    const query: Record<string, string> = {};
+    for (const [k, v] of Object.entries(sp)) if (typeof v === "string") query[k] = v;
+    query.page = String(p);
+    return { pathname: "/trades" as const, query };
   };
 
   return (

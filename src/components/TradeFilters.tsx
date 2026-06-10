@@ -15,7 +15,7 @@ export function TradeFilters() {
       if (value) next.set(key, value);
       else next.delete(key);
       next.delete("page"); // any filter change resets pagination
-      router.push(`/trades?${next.toString()}`);
+      router.push(`/trades?${next.toString()}` as Parameters<typeof router.push>[0]);
     },
     [params, router],
   );

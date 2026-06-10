@@ -102,9 +102,9 @@ jobs:
         run: |
           title="Pipeline failure — $(date -u +%Y-%m-%d)"
           existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "in:title \"$title\"" --json number --jq length)
+          body="The scheduled ingestion run failed. See run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} — check \`ingestion_runs\` for the failing stage."
           if [ "$existing" = "0" ]; then
-            gh issue create --repo "$GITHUB_REPOSITORY" \
-              --title "$title" \
-              --label pipeline-failure \
-              --body "The scheduled ingestion run failed. See run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} — check \`ingestion_runs\` for the failing stage."
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
+              --label pipeline-failure --body "$body" \
+            || gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
           fi

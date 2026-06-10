@@ -47,8 +47,8 @@ export const companies = pgTable(
     name: text("name").notNull(),
     ticker: text("ticker"),
     cik: text("cik"), // SEC EDGAR CIK
-    figi: text("figi"),
-    parentId: uuid("parent_id"),
+    figi: text("figi"), // deferred: populated when the OpenFIGI fallback lands
+    parentId: uuid("parent_id"), // deferred: subsidiary→parent rollups (post-v1)
     sector: text("sector"), // GICS sector
     industry: text("industry"), // SIC industry description
     aliases: text("aliases").array(), // brands, subsidiaries, products
@@ -90,11 +90,11 @@ export const filings = pgTable(
      */
     signaturePresent: boolean("signature_present"),
     signatureVerified: boolean("signature_verified"),
-    parseMethod: text("parse_method"), // 'consensus' | 'llm_adjudicated'
+    parseMethod: text("parse_method"), // heuristic-ocr|heuristic-embedded|llm_adjudicated|skipped-278e
     parseConfidence: real("parse_confidence"), // 0..1
-    status: text("status").default("pending").notNull(), // pending|parsed|review|published
-    version: integer("version").default(1).notNull(),
-    supersedesId: uuid("supersedes_id"),
+    status: text("status").default("pending").notNull(), // pending|parsed|review|published|superseded
+    version: integer("version").default(1).notNull(), // corrections-as-versions (amended filings)
+    supersedesId: uuid("supersedes_id"), // the canonical filing that superseded this copy
     parsedAt: timestamp("parsed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -126,8 +126,8 @@ export const transactions = pgTable(
     amountBand: smallint("amount_band").notNull(), // 1..10
     amountMin: bigint("amount_min", { mode: "number" }).notNull(),
     amountMax: bigint("amount_max", { mode: "number" }),
-    securityType: text("security_type"), // Stock|ETF|Bond|Option
-    owner: text("owner"), // Filer|Spouse|Dependent
+    securityType: text("security_type"), // deferred: instrument classification (post-v1)
+    owner: text("owner"), // deferred: 278-T scans rarely carry a legible owner column
     priceAtTxn: real("price_at_txn"),
     priceCurrent: real("price_current"),
     priceCurrentDate: date("price_current_date"),
@@ -161,7 +161,7 @@ export const statements = pgTable(
     attributionConf: real("attribution_conf").notNull(),
     needsReview: boolean("needs_review").default(false),
     contentHash: text("content_hash"),
-    supersededBy: uuid("superseded_by"),
+    supersededBy: uuid("superseded_by"), // CPD upgrade of a faster source (FR-S6, reconciler pending)
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [

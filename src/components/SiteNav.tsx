@@ -3,8 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { Route } from "next";
 
-const LINKS: { href: string; label: string }[] = [
+const LINKS: { href: Route; label: string }[] = [
   { href: "/trades", label: "Trades" },
   { href: "/companies", label: "Companies" },
   { href: "/timeline", label: "Timeline" },

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import type { Route } from "next";
 import type { TimelineEvent } from "@/lib/queries";
 import { formatDate } from "@/lib/format";
 
@@ -195,7 +196,7 @@ export function TimelineView({ events }: { events: TimelineEvent[] }) {
             </p>
             <div className="mt-2 text-xs">
               {pinned.internal ? (
-                <Link href={pinned.href} className="font-medium text-[var(--color-accent)] hover:underline">
+                <Link href={pinned.href as Route} className="font-medium text-[var(--color-accent)] hover:underline">
                   Open trade detail →
                 </Link>
               ) : (
@@ -214,7 +215,7 @@ export function TimelineView({ events }: { events: TimelineEvent[] }) {
                   {pinned.related.map((r, i) => (
                     <Link
                       key={i}
-                      href={r.href}
+                      href={r.href as Route}
                       className="flex items-center gap-1.5 rounded border border-[var(--color-rule-soft)] px-2 py-1 text-[0.7rem] hover:border-[var(--color-accent)]"
                     >
                       <span
@@ -277,7 +278,7 @@ export function TimelineView({ events }: { events: TimelineEvent[] }) {
                     </td>
                     <td className="px-3 py-2">
                       {e.internal ? (
-                        <Link href={e.href} className="hover:underline">
+                        <Link href={e.href as Route} className="hover:underline">
                           {e.label}
                         </Link>
                       ) : (
