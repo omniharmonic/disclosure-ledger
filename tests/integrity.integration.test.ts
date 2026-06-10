@@ -294,4 +294,48 @@ describe.runIf(HAS_DB)("public-surface integrity", () => {
       .delete(schema.statements)
       .where(inArray(schema.statements.id, [lowConf.id, superseded.id]));
   });
+
+  // ---- W-7 — bounded graph neighborhood -------------------------------------
+
+  it("graph neighborhood expands breadth-first within the depth bound", async () => {
+    const { getGraphNeighborhood } = await import("@/lib/queries");
+    // person → company (depth 1) → company's statement correlation (depth 2)
+    await db.insert(schema.graphEdges).values([
+      {
+        srcType: "person", srcId: personId,
+        dstType: "company", dstId: companyId,
+        relType: "TRADED", weight: 1,
+      },
+      {
+        srcType: "company", srcId: companyId,
+        dstType: "statement", dstId: statementId,
+        relType: "CORRELATES_WITH", weight: 80,
+      },
+    ]);
+
+    const depth1 = await getGraphNeighborhood("person", personId, 1);
+    expect(depth1.links).toHaveLength(1);
+    expect(depth1.nodes.map((n) => n.type).sort()).toEqual(["company", "person"]);
+
+    const depth2 = await getGraphNeighborhood("person", personId, 2);
+    expect(depth2.links).toHaveLength(2);
+    expect(depth2.nodes.map((n) => n.type).sort()).toEqual([
+      "company",
+      "person",
+      "statement",
+    ]);
+
+    expect(await getGraphNeighborhood("person", "not-a-uuid", 2)).toEqual({
+      nodes: [],
+      links: [],
+    });
+
+    const { and, eq } = await import("drizzle-orm");
+    await db
+      .delete(schema.graphEdges)
+      .where(and(eq(schema.graphEdges.srcType, "person"), eq(schema.graphEdges.srcId, personId)));
+    await db
+      .delete(schema.graphEdges)
+      .where(and(eq(schema.graphEdges.srcType, "company"), eq(schema.graphEdges.srcId, companyId)));
+  });
 });

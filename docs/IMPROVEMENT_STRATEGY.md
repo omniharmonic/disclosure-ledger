@@ -628,9 +628,22 @@ Every item above was addressed in the commit series following this document. Sta
 | §9 testing | ✅ 49 tests: gazetteer precision firewall, scoring invariants, topics, reconcile matcher, redaction, dates, D1/D2/D3 DB regressions; CI workflow runs all of it + build against Postgres 16 with TZ pinned west of UTC | throughout + cleanup |
 | Cleanup inventory | ✅ `zod` wired, `Placeholder.tsx` removed, `db:migrate` real, typedRoutes enabled, deferred columns annotated, LICENSE (MIT) added, README rewritten | cleanup commit |
 
-**Still open (documented, deliberately not faked):** full PKCS#7 chain verification (FR-T3);
-American Presidency Project scraper and the caption/speaker-segmentation layer (FR-S1
-priorities 1/5, FR-S3); CPD-upgrades-faster-source reconciliation (FR-S6); LLM mention layer
-with sentiment/stance (FR-S4 beyond gazetteer); directional-consistency modelling (returns to
-the score when price-impact direction exists); graph lazy-expansion API; durable object
-storage for PDFs; OGE `PAS+Index` polling for the future Cabinet expansion.
+### Second remediation round — the formerly-open items (June 2026)
+
+| Item | Status | Notes |
+|---|---|---|
+| FR-T3 signature verification | ✅ | Real CMS verification (pkijs): byte-range digest + signature against the embedded cert, signer CN recorded; tested with an openssl-signed fixture incl. a tamper case. Chain-to-root validation remains explicitly out of scope and the filing page says "integrity verified", never "identity verified". |
+| FR-S1 p1 — APP scraper | ✅ | `ingest-app`: defensive multi-strategy parsers (fixture-tested), strict Trump person filter, single-speaker gate, incremental floor, zero-yield reported as probable markup drift. |
+| FR-S1 p5 / FR-S3 — captions + segmentation | ✅ | `ingest-youtube` per STATEMENT_INGESTION.md: curated tiered channels, uploads-playlist discovery, Supadata caption retrieval (no ASR), text-only LLM speaker segmentation; TRUMP spans ≥ 0.8 attributed, lower → needs_review, OTHER/UNCERTAIN never attributed; tier-B skipped without the LLM key. The FR-S3 gate is enforced in `correlate` and regression-tested. |
+| FR-S6 — CPD supersede | ✅ | CPD ingester upgrades faster-source copies (same-day + bigram-Dice similarity, precision-tuned); superseded records leave timeline + correlations, stay in the corpus/API. |
+| FR-S4 — LLM mention layer | ✅ | `llm-mentions`: sentiment/stance per company + fuzzy references constrained to the traded universe; every span byte-verified (FR-S5), hallucinations rejected and counted; gazetteer hits gate the LLM spend. |
+| Directional consistency | ✅ | Scoring v1.2: real component (0.10) per the PRD scale — verified sentiment drives statement direction, contract awards count favorable, unknown = 0.5 by definition; verified live (aligned purchase scores 1.0). |
+| W-7 — graph lazy expansion | ✅ | `GET /api/v1/graph?node=<type>:<uuid>&depth=1..3` — bounded BFS (hard edge cap), shared label assembler; integration-tested depth semantics. |
+| W-9 — durable PDF storage | ✅ | S3-compatible PUT with hand-rolled SigV4 (R2 free tier fits the $0 budget), env-gated, never blocks ingestion; `archive_url` linked on filing pages as the mirrored copy. |
+| FR-T1 — OGE `PAS+Index` polling | ✅ | Tolerant Domino `ReadViewEntries` parser (fixture-tested across the JSON value shapes) wired into discovery as a best-effort redundant channel and the G8 appointee-expansion foundation. |
+
+**Remaining by design:** certificate chain-to-root validation (a trust-store policy decision,
+clearly disclosed in the UI); speaker *voiceprint* verification (requires audio processing —
+out of v1 scope per the PRD). Operator actions: provision `DATA_GOV_API_KEY`,
+`YOUTUBE_API_KEY`/`SUPADATA_API_KEY`, `PDF_ARCHIVE_*`, and a `RECONCILE_DATA_*` snapshot to
+activate the corresponding stages; rotate the price-API keys exposed before D4's redaction.

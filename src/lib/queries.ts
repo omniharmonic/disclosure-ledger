@@ -443,6 +443,69 @@ export interface GraphLink {
 /** The full knowledge graph as nodes + links for force-directed rendering. */
 export async function getGraph(): Promise<{ nodes: GraphNode[]; links: GraphLink[] }> {
   const edges = await db.select().from(graphEdges);
+  return assembleGraph(edges);
+}
+
+/**
+ * Bounded neighborhood expansion (FR-W7 lazy expansion / W-7): breadth-first
+ * walk of `graph_edges` from a root node, depth ≤ 3, with hard node/edge caps
+ * so a request can never pull the whole graph through this path.
+ */
+export async function getGraphNeighborhood(
+  rootType: string,
+  rootId: string,
+  depth: number,
+): Promise<{ nodes: GraphNode[]; links: GraphLink[] }> {
+  if (!isUuid(rootId)) return { nodes: [], links: [] };
+  const MAX_DEPTH = 3;
+  const MAX_EDGES = 1_500;
+  const d = Math.min(MAX_DEPTH, Math.max(1, depth));
+
+  const visited = new Set<string>([`${rootType}:${rootId}`]);
+  let frontier: { type: string; id: string }[] = [{ type: rootType, id: rootId }];
+  const collected: (typeof graphEdges.$inferSelect)[] = [];
+  const seenEdge = new Set<number>();
+
+  for (let level = 0; level < d && frontier.length > 0; level++) {
+    const next: { type: string; id: string }[] = [];
+    // Chunk the frontier to keep each OR-condition list bounded.
+    for (let i = 0; i < frontier.length; i += 100) {
+      const chunk = frontier.slice(i, i + 100);
+      const cond = or(
+        ...chunk.flatMap((f) => [
+          and(eq(graphEdges.srcType, f.type), eq(graphEdges.srcId, f.id)),
+          and(eq(graphEdges.dstType, f.type), eq(graphEdges.dstId, f.id)),
+        ]),
+      );
+      const found = await db.select().from(graphEdges).where(cond).limit(MAX_EDGES);
+      for (const e of found) {
+        if (seenEdge.has(e.id)) continue;
+        seenEdge.add(e.id);
+        collected.push(e);
+        for (const [t, id] of [
+          [e.srcType, e.srcId],
+          [e.dstType, e.dstId],
+        ] as const) {
+          const k = `${t}:${id}`;
+          if (!visited.has(k)) {
+            visited.add(k);
+            next.push({ type: t, id });
+          }
+        }
+        if (collected.length >= MAX_EDGES) break;
+      }
+      if (collected.length >= MAX_EDGES) break;
+    }
+    if (collected.length >= MAX_EDGES) break;
+    frontier = next;
+  }
+  return assembleGraph(collected);
+}
+
+/** Resolve labels/details for a set of edges and shape them for the client. */
+async function assembleGraph(
+  edges: (typeof graphEdges.$inferSelect)[],
+): Promise<{ nodes: GraphNode[]; links: GraphLink[] }> {
   const ids: Record<string, Set<string>> = {};
   for (const e of edges) {
     (ids[e.srcType] ??= new Set()).add(e.srcId);

@@ -13,7 +13,8 @@
 import { db } from "@/db";
 import { filings } from "@/db/schema";
 import { PRESIDENT_FILING_SEEDS } from "../lib/seeds";
-import { fetchText } from "../lib/http";
+import { fetchJson, fetchText } from "../lib/http";
+import { parseDominoEntries, ogeCandidatesFrom, ogePdfUrl } from "../lib/oge-domino";
 
 export interface FilingCandidate {
   filerName: string;
@@ -92,6 +93,41 @@ async function discoverWhiteHouse(): Promise<FilingCandidate[]> {
   return out;
 }
 
+/**
+ * Poll the OGE Domino `PAS+Index` view as JSON (FR-T1). The President is not
+ * in this appointee view, so for v1 this is a redundant channel that exists
+ * to (a) catch any future restructuring that does list him and (b) carry the
+ * Cabinet/appointee expansion (G8) — extend the filer regex per tracked
+ * person. Best-effort: a failure is logged, never fatal to discovery.
+ */
+async function discoverOgeView(): Promise<FilingCandidate[]> {
+  const out: FilingCandidate[] = [];
+  const url =
+    "https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index?ReadViewEntries&OutputFormat=JSON&Count=-1";
+  try {
+    const json = await fetchJson<unknown>(url, { retries: 1, timeoutMs: 45_000 });
+    const entries = parseDominoEntries(json);
+    const candidates = ogeCandidatesFrom(entries, /trump,?\s+donald|donald\s+(j\.?\s+)?trump/i);
+    for (const c of candidates) {
+      if (!c.filename) continue; // no attachment column — nothing fetchable
+      const sourceUrl = ogePdfUrl(c.unid, c.filename);
+      out.push({
+        filerName: c.filerName,
+        formType: c.formType,
+        filingDate: c.filingDate,
+        sourceUrl,
+        sourceDomain: domainOf(sourceUrl),
+        ogeUnid: c.unid,
+        label: `OGE view: ${c.filename}`,
+      });
+    }
+    console.log(`[discover] OGE view: ${entries.length} entries, ${out.length} tracked-filer 278s`);
+  } catch (err) {
+    console.warn(`[discover] OGE view unavailable (expected redundancy): ${String(err)}`);
+  }
+  return out;
+}
+
 /** All filing source URLs already known to the database. */
 async function knownSourceUrls(): Promise<Set<string>> {
   const rows = await db.select({ url: filings.sourceUrl }).from(filings);
@@ -116,6 +152,7 @@ export async function discover(): Promise<FilingCandidate[]> {
   }
 
   candidates.push(...(await discoverWhiteHouse()));
+  candidates.push(...(await discoverOgeView()));
 
   // Deduplicate by sourceUrl, drop anything already ingested.
   const unique = new Map<string, FilingCandidate>();

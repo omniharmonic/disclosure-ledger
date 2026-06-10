@@ -52,18 +52,26 @@ The ingestion pipeline lives in [`pipeline/`](pipeline/) (Python extractor) and
 failure domain, all logged to `ingestion_runs`:
 
 ```
-discover → fetch → dedupe → parse → reconcile → statements (Truth Social)
-→ cpd (govinfo) → actions (Federal Register + White House) → usaspending
-→ enrich → prices → mentions → correlate → verify → graph-build
+discover (seeds + White House + OGE view) → fetch (sign-verify + archive)
+→ dedupe → parse → reconcile → statements (Truth Social) → app (UCSB APP)
+→ cpd (govinfo, supersedes faster copies) → youtube (captions + speaker
+segmentation) → actions (Federal Register + White House) → usaspending
+→ enrich → prices → mentions (gazetteer) → llm-mentions (sentiment/stance)
+→ correlate → verify → graph-build
 ```
 
-Key-gated stages (`ANTHROPIC_API_KEY`, `DATA_GOV_API_KEY`, price keys,
-`RECONCILE_DATA_*`) are logged no-ops until their key is provisioned.
+Key-gated stages (`ANTHROPIC_API_KEY`, `DATA_GOV_API_KEY`, `YOUTUBE_API_KEY`
++ `SUPADATA_API_KEY`, price keys, `RECONCILE_DATA_*`, `PDF_ARCHIVE_*`) are
+logged no-ops until their key is provisioned. Every PDF's embedded PKCS#7
+signature is cryptographically verified (document integrity) on fetch;
+statements only form correlation edges when their attribution is solved
+(official transcript, or caption-derived speaker spans ≥ 0.8 confidence).
 
 ## Public API
 
 Read-only JSON API under `/api/v1` — transactions, filings, statements,
-actions, correlations, companies, graph, and bulk NDJSON/CSV export. OpenAPI
+actions, correlations, companies, graph (full or `?node=<type>:<id>&depth=`
+bounded neighborhood expansion), and bulk NDJSON/CSV export. OpenAPI
 spec at `/api/v1/openapi.json`; human docs at `/api-docs`. Anonymous callers
 get 500 requests/day per IP; `X-API-Key` raises the limit per key.
 

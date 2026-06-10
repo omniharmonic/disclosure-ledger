@@ -353,6 +353,24 @@ export const OPENAPI_SPEC = {
     "/graph": {
       get: {
         summary: "The knowledge graph as { nodes, links }",
+        description:
+          "Without parameters: the full company-aggregated graph. With node + depth: a bounded breadth-first neighborhood of one node (lazy expansion; depth ≤ 3, hard edge cap).",
+        parameters: [
+          {
+            name: "node",
+            in: "query",
+            schema: {
+              type: "string",
+              pattern: "^(person|company|filing|statement|action):[0-9a-f-]{36}$",
+            },
+            description: "root node as <type>:<uuid>",
+          },
+          {
+            name: "depth",
+            in: "query",
+            schema: { type: "integer", minimum: 1, maximum: 3, default: 2 },
+          },
+        ],
         responses: {
           "200": {
             description: "OK",
