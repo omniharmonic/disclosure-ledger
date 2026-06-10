@@ -21,6 +21,7 @@ export type Stage =
   | "enrich"
   | "ingest-prices"
   | "detect-mentions"
+  | "llm-mentions"
   | "correlate"
   | "verify-correlations"
   | "graph-build";

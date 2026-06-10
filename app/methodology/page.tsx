@@ -12,6 +12,7 @@ const COMPONENT_NAMES: Record<ComponentName, string> = {
   temporalProximity: "Temporal proximity",
   entitySpecificity: "Entity specificity",
   authority: "Authority",
+  directionalConsistency: "Directional consistency",
   tradeMagnitude: "Trade magnitude",
   corroboration: "Corroboration",
 };
@@ -144,14 +145,15 @@ export default function MethodologyPage() {
         </tbody>
       </table>
       <p>
-        <strong>What is deliberately not in the model (yet):</strong> directional
-        consistency — whether the trade&rsquo;s direction aligns with an event&rsquo;s
-        expected price impact — requires price-impact modelling that v1 does not perform, so
-        it is excluded from the score rather than shown as a placeholder. Each correlation is
-        additionally passed through a reasoning check that asks whether the matched text is
-        genuinely about the company (and not a string coincidence like &ldquo;Southern
-        Co&rdquo; vs. &ldquo;the southern border&rdquo;); pairs judged coincidental are
-        removed from public view.
+        <strong>Where direction comes from:</strong> statement direction is the speaker&rsquo;s
+        verified sentiment toward the company (extracted by the language-model mention layer
+        and only stored when its verbatim quote is programmatically confirmed present in the
+        source text); a federal contract award counts as favorable. Pairs without a verified
+        direction score 0.5 — &ldquo;unknown&rdquo;, by definition, never a hidden default.
+        Each correlation is additionally passed through a reasoning check that asks whether
+        the matched text is genuinely about the company (and not a string coincidence like
+        &ldquo;Southern Co&rdquo; vs. &ldquo;the southern border&rdquo;); pairs judged
+        coincidental are removed from public view.
       </p>
 
       <H>Scoring changelog</H>

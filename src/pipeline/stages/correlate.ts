@@ -34,6 +34,7 @@ import {
   temporalProximity,
   magnitudeScore,
   corroborationScore,
+  directionalScore,
   score,
 } from "@/lib/scoring";
 import { topicsForCompany } from "../lib/topics";
@@ -85,6 +86,8 @@ interface CandidateEvent {
   date: string;
   /** 1.0 direct issuer mention · 0.6 sub-industry topic match. */
   specificity: number;
+  /** Actions only — drives the contract-award direction signal. */
+  actionType?: string | null;
 }
 
 export interface CorrelateResult {
@@ -101,6 +104,7 @@ export async function correlate(): Promise<CorrelateResult> {
       id: transactions.id,
       companyId: transactions.companyId,
       date: transactions.transactionDate,
+      type: transactions.transactionType,
       band: transactions.amountBand,
       industry: companies.industry,
       sector: companies.sector,
@@ -142,7 +146,11 @@ export async function correlate(): Promise<CorrelateResult> {
       .orderBy(statements.id);
 
     const directActs = await db
-      .selectDistinctOn([actions.id], { id: actions.id, date: actions.occurredOn })
+      .selectDistinctOn([actions.id], {
+        id: actions.id,
+        date: actions.occurredOn,
+        actionType: actions.actionType,
+      })
       .from(actionTargets)
       .innerJoin(actions, eq(actionTargets.actionId, actions.id))
       .where(
@@ -174,7 +182,11 @@ export async function correlate(): Promise<CorrelateResult> {
 
     const topicActs = topics.length
       ? await db
-          .selectDistinctOn([actions.id], { id: actions.id, date: actions.occurredOn })
+          .selectDistinctOn([actions.id], {
+            id: actions.id,
+            date: actions.occurredOn,
+            actionType: actions.actionType,
+          })
           .from(actionTargets)
           .innerJoin(actions, eq(actionTargets.actionId, actions.id))
           .where(
@@ -190,16 +202,55 @@ export async function correlate(): Promise<CorrelateResult> {
     // Merge, direct-first: an event that both names the company and mentions
     // the topic scores as a direct mention.
     const byKey = new Map<string, CandidateEvent>();
-    const add = (kind: "statement" | "action", id: string, date: string, spec: number) => {
+    const add = (
+      kind: "statement" | "action",
+      id: string,
+      date: string,
+      spec: number,
+      actionType?: string | null,
+    ) => {
       const k = `${kind}:${id}`;
       const existing = byKey.get(k);
-      if (!existing || spec > existing.specificity) byKey.set(k, { kind, id, date, specificity: spec });
+      if (!existing || spec > existing.specificity)
+        byKey.set(k, { kind, id, date, specificity: spec, actionType });
     };
     for (const s of directStmts) add("statement", s.id, s.date, 1);
-    for (const a of directActs) add("action", a.id, a.date, 1);
+    for (const a of directActs) add("action", a.id, a.date, 1, a.actionType);
     for (const s of topicStmts) add("statement", s.id, s.date, 0.6);
-    for (const a of topicActs) add("action", a.id, a.date, 0.6);
+    for (const a of topicActs) add("action", a.id, a.date, 0.6, a.actionType);
     const events = [...byKey.values()];
+
+    // Verified sentiment toward this company (or its topics) per candidate
+    // statement — the statement side of the direction signal. LLM-enriched
+    // spans win over bare gazetteer rows (which carry no sentiment).
+    const stmtIds = events.filter((e) => e.kind === "statement").map((e) => e.id);
+    const sentimentByStmt = new Map<string, string>();
+    if (stmtIds.length > 0) {
+      const rows = await db
+        .select({
+          statementId: statementMentions.statementId,
+          sentiment: statementMentions.sentiment,
+          method: statementMentions.method,
+        })
+        .from(statementMentions)
+        .where(
+          and(
+            inArray(statementMentions.statementId, stmtIds),
+            sql`${statementMentions.sentiment} is not null`,
+            or(
+              eq(statementMentions.companyId, t.companyId),
+              topics.length ? inArray(statementMentions.sector, topics) : sql`false`,
+            ),
+          ),
+        );
+      for (const r of rows) {
+        if (!r.sentiment) continue;
+        // llm-method rows take precedence; first writer wins otherwise
+        if (r.method === "llm" || !sentimentByStmt.has(r.statementId)) {
+          sentimentByStmt.set(r.statementId, r.sentiment);
+        }
+      }
+    }
 
     const corroboration = corroborationScore(events.length);
     const authority = t.authority ?? 1;
@@ -212,6 +263,12 @@ export async function correlate(): Promise<CorrelateResult> {
           temporalProximity: temporalProximity(gap),
           entitySpecificity: ev.specificity,
           authority,
+          directionalConsistency: directionalScore(
+            t.type,
+            ev.kind,
+            ev.kind === "statement" ? (sentimentByStmt.get(ev.id) ?? null) : null,
+            ev.actionType ?? null,
+          ),
           tradeMagnitude,
           corroboration,
         };

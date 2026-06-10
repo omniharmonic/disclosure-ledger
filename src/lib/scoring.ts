@@ -9,20 +9,21 @@
  */
 import { bandMidpoint } from "./bands";
 
-export const SCORING_VERSION = "1.1";
+export const SCORING_VERSION = "1.2";
 
 /**
- * v1.1 — every weighted component genuinely varies. Directional consistency
- * (trade direction vs. expected price impact) is NOT in the active model: in
- * v1.0 it was a hardcoded 0.5 placeholder, which rendered as a flat
- * half-marks bar on every correlation card and implied analysis that did not
- * occur. It returns as a scored component when price-impact direction
- * modelling lands.
+ * v1.2 — directional consistency returns as a *real* component now that the
+ * pipeline carries the signals it needs: statement sentiment toward the
+ * company (LLM mention layer) and action type (a contract award is a
+ * favorable act). Alignment unknown = 0.5 by definition (the PRD's own
+ * scale: 1.0 aligned / 0.5 unknown / 0.0 opposite) — it varies wherever the
+ * underlying sentiment/action data exists.
  */
 export const WEIGHTS = {
-  temporalProximity: 0.35,
+  temporalProximity: 0.3,
   entitySpecificity: 0.25,
-  authority: 0.15,
+  authority: 0.1,
+  directionalConsistency: 0.1,
   tradeMagnitude: 0.1,
   corroboration: 0.15,
 } as const;
@@ -38,6 +39,8 @@ export const COMPONENT_DEFINITIONS: Record<ComponentName, string> = {
     "1.0 when the event names the traded company directly; 0.6 when it addresses the company's sub-industry (e.g. “semiconductors” for an NVIDIA trade).",
   authority:
     "The filer's policy power over the traded company — 1.0 for the President; recorded per filer so future filers (Cabinet, Congress) score lower.",
+  directionalConsistency:
+    "Whether the trade's direction aligns with the event's expected price impact: a purchase before favorable words/acts (or a sale before unfavorable ones) scores 1.0; the opposite pairing 0.0; alignment unknown 0.5. Statement direction comes from verified sentiment; a federal contract award counts as favorable.",
   tradeMagnitude:
     "Log-normalized midpoint of the disclosed amount band, 0..1 — a $5M trade signals more than a $15K one.",
   corroboration:
@@ -45,6 +48,12 @@ export const COMPONENT_DEFINITIONS: Record<ComponentName, string> = {
 };
 
 export const SCORING_CHANGELOG: readonly { version: string; date: string; change: string }[] = [
+  {
+    version: "1.2",
+    date: "June 2026",
+    change:
+      "Directional consistency reinstated as a real component (weight 0.10): trade direction vs. the event's expected price impact, derived from verified statement sentiment (LLM mention layer) and action type (contract awards count as favorable). Alignment unknown scores 0.5 by definition. Temporal proximity 0.35 → 0.30, authority 0.15 → 0.10.",
+  },
   {
     version: "1.1",
     date: "June 2026",
@@ -76,6 +85,40 @@ export function magnitudeScore(band: number): number {
 /** Corroboration bonus for multiple independent in-window events. */
 export function corroborationScore(eventCount: number): number {
   return Math.min(1, Math.max(0, (eventCount - 1) * 0.25));
+}
+
+/**
+ * Directional consistency — does the trade's direction align with the
+ * event's expected price impact? (PRD §6.2: 1.0 aligned / 0.5 unknown /
+ * 0.0 opposite.)
+ *
+ *   • Statements: verified sentiment toward the company. Favorable words
+ *     before a purchase (or unfavorable before a sale) align.
+ *   • Actions: a federal contract award is favorable; other action types
+ *     have no modelled direction yet → unknown.
+ *   • Exchanges and unknown trade types have no direction → unknown.
+ */
+export function directionalScore(
+  tradeType: string,
+  eventKind: "statement" | "action",
+  sentiment: string | null,
+  actionType: string | null,
+): number {
+  const isBuy = tradeType.startsWith("Purchase");
+  const isSell = tradeType.startsWith("Sale");
+  if (!isBuy && !isSell) return 0.5;
+
+  let impact: "positive" | "negative" | null = null;
+  if (eventKind === "statement") {
+    if (sentiment === "positive") impact = "positive";
+    else if (sentiment === "negative") impact = "negative";
+  } else if (actionType === "contract") {
+    impact = "positive";
+  }
+  if (!impact) return 0.5;
+
+  const aligned = (impact === "positive") === isBuy;
+  return aligned ? 1 : 0;
 }
 
 /** Composite 0–100 signal, one decimal. */

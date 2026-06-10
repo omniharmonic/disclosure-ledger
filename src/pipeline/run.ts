@@ -38,6 +38,7 @@ import { ingestActions } from "./stages/ingest-actions";
 import { ingestUsaSpending } from "./stages/ingest-usaspending";
 import { ingestWhiteHouse } from "./stages/ingest-whitehouse";
 import { detectMentions } from "./stages/detect-mentions";
+import { llmMentions } from "./stages/llm-mentions";
 import { correlate } from "./stages/correlate";
 import { verifyCorrelations } from "./stages/verify-correlations";
 import { buildGraph } from "./stages/graph-build";
@@ -132,6 +133,12 @@ const runMentions = () =>
     return { result, itemsFound: result.statementMentions };
   });
 
+const runLlmMentions = () =>
+  withRun("llm-mentions", async () => {
+    const result = await llmMentions();
+    return { result, itemsFound: result.enriched + result.added, errors: result.errors };
+  });
+
 const runCorrelate = () =>
   withRun("correlate", async () => {
     const result = await correlate();
@@ -184,6 +191,7 @@ const FULL_PIPELINE: [string, () => Promise<unknown>][] = [
   ["enrich", runEnrich],
   ["prices", runPrices],
   ["mentions", runMentions],
+  ["llm-mentions", runLlmMentions],
   ["correlate", runCorrelate],
   ["verify", runVerify],
   ["graph", runGraph],
@@ -231,6 +239,9 @@ async function main(): Promise<void> {
       break;
     case "mentions":
       await runMentions();
+      break;
+    case "llm-mentions":
+      await runLlmMentions();
       break;
     case "correlate":
       await runCorrelate();

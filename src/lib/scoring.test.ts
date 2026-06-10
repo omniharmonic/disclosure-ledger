@@ -7,6 +7,7 @@ import {
   temporalProximity,
   magnitudeScore,
   corroborationScore,
+  directionalScore,
   score,
   type ComponentName,
 } from "./scoring";
@@ -56,6 +57,7 @@ describe("scoring model", () => {
       temporalProximity: 1,
       entitySpecificity: 1,
       authority: 1,
+      directionalConsistency: 1,
       tradeMagnitude: 1,
       corroboration: 1,
     });
@@ -64,10 +66,28 @@ describe("scoring model", () => {
       temporalProximity: 1,
       entitySpecificity: 0.6,
       authority: 1,
+      directionalConsistency: 0.5,
       tradeMagnitude: 0.5,
       corroboration: 0,
     });
     expect(sectorOnly).toBeLessThan(max);
     expect(sectorOnly).toBeGreaterThan(0);
+  });
+
+  it("directional consistency follows the PRD scale (1 aligned / 0.5 unknown / 0 opposite)", () => {
+    // favorable words before a purchase align; before a sale they oppose
+    expect(directionalScore("Purchase", "statement", "positive", null)).toBe(1);
+    expect(directionalScore("Sale", "statement", "positive", null)).toBe(0);
+    expect(directionalScore("Sale (Partial)", "statement", "negative", null)).toBe(1);
+    expect(directionalScore("Purchase", "statement", "negative", null)).toBe(0);
+    // unknown sentiment / undirected events / undirected trades → 0.5
+    expect(directionalScore("Purchase", "statement", "neutral", null)).toBe(0.5);
+    expect(directionalScore("Purchase", "statement", null, null)).toBe(0.5);
+    expect(directionalScore("Exchange", "statement", "positive", null)).toBe(0.5);
+    expect(directionalScore("Unknown", "action", null, "contract")).toBe(0.5);
+    // a contract award is favorable
+    expect(directionalScore("Purchase", "action", null, "contract")).toBe(1);
+    expect(directionalScore("Sale", "action", null, "contract")).toBe(0);
+    expect(directionalScore("Purchase", "action", null, "executive_order")).toBe(0.5);
   });
 });
