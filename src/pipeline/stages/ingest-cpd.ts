@@ -19,19 +19,14 @@
 import { createHash } from "node:crypto";
 import { db } from "@/db";
 import { statements } from "@/db/schema";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import { fetchJson, fetchText } from "../lib/http";
 import { ensurePresident } from "../lib/persons";
+import { isSingleSpeakerTitle, statementsLikelySame } from "../lib/statement-filters";
 
 const API = "https://api.govinfo.gov";
 /** Trump's second term began 2025-01-20 — the backfill floor. */
 const TERM_START = "2025-01-20";
-
-/** Single-speaker title prefixes safe to auto-attribute. */
-const SINGLE_SPEAKER = /^(remarks|address|statement|message|commencement|inaugural|letter)/i;
-/** Multi-speaker categories deferred to the speaker-segmentation layer. */
-const MULTI_SPEAKER =
-  /(news conference|interview|exchange with reporters|question-and-answer|town hall|debate)/i;
 
 interface CpdPackage {
   packageId: string; // DCPD-YYYYNNNNN
@@ -80,11 +75,19 @@ export interface CpdResult {
   ingested: number;
   skipped: number;
   deferredMultiSpeaker: number;
+  /** Faster-source records upgraded to this official text (FR-S6). */
+  supersededFaster: number;
   errors: string[];
 }
 
 export async function ingestCpd(): Promise<CpdResult> {
-  const result: CpdResult = { ingested: 0, skipped: 0, deferredMultiSpeaker: 0, errors: [] };
+  const result: CpdResult = {
+    ingested: 0,
+    skipped: 0,
+    deferredMultiSpeaker: 0,
+    supersededFaster: 0,
+    errors: [],
+  };
 
   const key = process.env.DATA_GOV_API_KEY;
   if (!key) {
@@ -136,7 +139,7 @@ export async function ingestCpd(): Promise<CpdResult> {
           result.skipped++;
           continue;
         }
-        if (MULTI_SPEAKER.test(title) || !SINGLE_SPEAKER.test(title)) {
+        if (!isSingleSpeakerTitle(title)) {
           result.deferredMultiSpeaker++;
           continue;
         }
@@ -164,11 +167,12 @@ export async function ingestCpd(): Promise<CpdResult> {
           continue;
         }
 
-        await db
+        const spokenAt = pkg.dateIssued.slice(0, 10);
+        const [inserted] = await db
           .insert(statements)
           .values({
             personId,
-            spokenAt: pkg.dateIssued.slice(0, 10),
+            spokenAt,
             channel: channelOf(title),
             venue: title.slice(0, 200),
             fullText: fullText.slice(0, 60_000),
@@ -179,8 +183,45 @@ export async function ingestCpd(): Promise<CpdResult> {
             attributionConf: 1,
             contentHash,
           })
-          .onConflictDoNothing({ target: statements.contentHash });
+          .onConflictDoNothing({ target: statements.contentHash })
+          .returning({ id: statements.id });
         result.ingested++;
+
+        // FR-S6 — the official CPD text supersedes any faster-source copy of
+        // the same event (APP, White House remarks, captions). The superseded
+        // record stays in the corpus but no longer forms correlation edges;
+        // its CPD replacement does.
+        if (inserted) {
+          const sameDay = await db
+            .select({
+              id: statements.id,
+              fullText: statements.fullText,
+              venue: statements.venue,
+              spokenAt: statements.spokenAt,
+            })
+            .from(statements)
+            .where(
+              and(
+                eq(statements.spokenAt, spokenAt),
+                ne(statements.source, "cpd"),
+                isNull(statements.supersededBy),
+              ),
+            );
+          for (const candidate of sameDay) {
+            if (
+              statementsLikelySame(
+                { spokenAt, fullText, venue: title },
+                candidate,
+              )
+            ) {
+              await db
+                .update(statements)
+                .set({ supersededBy: inserted.id })
+                .where(eq(statements.id, candidate.id));
+              result.supersededFaster++;
+            }
+          }
+        }
       } catch (err) {
         result.errors.push(`${pkg.packageId}: ${String(err)}`);
       }
@@ -191,7 +232,8 @@ export async function ingestCpd(): Promise<CpdResult> {
 
   console.log(
     `[ingest-cpd] ${result.ingested} new, ${result.skipped} skipped, ` +
-      `${result.deferredMultiSpeaker} multi-speaker deferred (need segmentation layer)`,
+      `${result.deferredMultiSpeaker} multi-speaker deferred, ` +
+      `${result.supersededFaster} faster-source records upgraded to official text`,
   );
   return result;
 }

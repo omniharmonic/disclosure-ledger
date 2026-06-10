@@ -31,7 +31,9 @@ import { reconcile } from "./stages/reconcile";
 import { enrichTransactions } from "./stages/enrich";
 import { ingestPrices } from "./stages/ingest-prices";
 import { ingestStatements } from "./stages/ingest-statements";
+import { ingestApp } from "./stages/ingest-app";
 import { ingestCpd } from "./stages/ingest-cpd";
+import { ingestYoutube } from "./stages/ingest-youtube";
 import { ingestActions } from "./stages/ingest-actions";
 import { ingestUsaSpending } from "./stages/ingest-usaspending";
 import { ingestWhiteHouse } from "./stages/ingest-whitehouse";
@@ -77,9 +79,21 @@ const runStatements = () =>
     return { result, itemsFound: result.ingested, errors: result.errors };
   });
 
+const runApp = () =>
+  withRun("ingest-app", async () => {
+    const result = await ingestApp();
+    return { result, itemsFound: result.ingested, errors: result.errors };
+  });
+
 const runCpd = () =>
   withRun("ingest-cpd", async () => {
     const result = await ingestCpd();
+    return { result, itemsFound: result.ingested, errors: result.errors };
+  });
+
+const runYoutube = () =>
+  withRun("ingest-youtube", async () => {
+    const result = await ingestYoutube();
     return { result, itemsFound: result.ingested, errors: result.errors };
   });
 
@@ -162,7 +176,9 @@ const FULL_PIPELINE: [string, () => Promise<unknown>][] = [
   ["parse", runParse],
   ["reconcile", runReconcile],
   ["statements", runStatements],
+  ["app", runApp],
   ["cpd", runCpd],
+  ["youtube", runYoutube],
   ["actions", runActions],
   ["usaspending", runUsaSpending],
   ["enrich", runEnrich],
@@ -192,8 +208,14 @@ async function main(): Promise<void> {
     case "statements":
       await runStatements();
       break;
+    case "app":
+      await runApp();
+      break;
     case "cpd":
       await runCpd();
+      break;
+    case "youtube":
+      await runYoutube();
       break;
     case "actions":
       await runActions();

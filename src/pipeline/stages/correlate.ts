@@ -27,7 +27,7 @@ import {
   actionTargets,
   correlations,
 } from "@/db/schema";
-import { and, eq, gte, lte, lt, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, or, eq, gte, lte, lt, inArray, isNull, isNotNull, sql } from "drizzle-orm";
 import {
   SCORING_VERSION,
   type ScoreComponents,
@@ -48,6 +48,26 @@ const SCORE_THRESHOLD = 25;
 /** Cap per trade — keep only the highest-signal events so one heavily-named
  *  company does not bury a trade under hundreds of low-signal correlations. */
 const MAX_PER_TRADE = 25;
+
+/**
+ * FR-S3 — attribution trust gate. Only statements whose attribution is
+ * solved may form correlation edges: official transcripts always; caption-
+ * derived spans only above the speaker-attribution confidence threshold and
+ * never while flagged for review. Superseded records (a faster source later
+ * upgraded to the official CPD text, FR-S6) never correlate — their official
+ * replacement does.
+ */
+const TRUSTED_STATEMENT = and(
+  isNull(statements.supersededBy),
+  or(
+    eq(statements.attributionMethod, "official_transcript"),
+    and(
+      eq(statements.attributionMethod, "caption_derived"),
+      gte(statements.attributionConf, 0.8),
+      sql`${statements.needsReview} is not true`,
+    ),
+  ),
+);
 
 function daysBetween(a: string, b: string): number {
   return Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
@@ -116,6 +136,7 @@ export async function correlate(): Promise<CorrelateResult> {
           eq(statementMentions.companyId, t.companyId),
           gte(statements.spokenAt, from),
           lte(statements.spokenAt, to),
+          TRUSTED_STATEMENT,
         ),
       )
       .orderBy(statements.id);
@@ -145,6 +166,7 @@ export async function correlate(): Promise<CorrelateResult> {
               inArray(statementMentions.sector, topics),
               gte(statements.spokenAt, from),
               lte(statements.spokenAt, to),
+              TRUSTED_STATEMENT,
             ),
           )
           .orderBy(statements.id)

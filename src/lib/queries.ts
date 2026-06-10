@@ -579,6 +579,8 @@ export async function getTimelineEvents(limit = 600): Promise<TimelineEvent[]> {
     })
     .from(statementMentions)
     .innerJoin(statements, eq(statementMentions.statementId, statements.id))
+    // a record upgraded to the official CPD text is shown via its replacement
+    .where(sql`${statements.supersededBy} is null`)
     .orderBy(desc(statements.spokenAt), statements.id)
     .limit(limit);
 
@@ -720,6 +722,8 @@ export async function listStatements(filter: StatementFilter = {}) {
       sourceUrl: statements.sourceUrl,
       attributionMethod: statements.attributionMethod,
       attributionConf: statements.attributionConf,
+      needsReview: statements.needsReview,
+      supersededBy: statements.supersededBy,
     })
     .from(statements);
 

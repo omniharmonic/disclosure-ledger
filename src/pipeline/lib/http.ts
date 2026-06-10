@@ -41,11 +41,13 @@ export interface FetchOptions {
   accept?: string;
   /** Override the User-Agent (e.g. APIs that reject non-browser agents). */
   userAgent?: string;
+  /** Extra request headers (e.g. an API key header). */
+  headers?: Record<string, string>;
 }
 
 /** Fetch with throttling, retries, and a descriptive User-Agent. */
 export async function politeFetch(url: string, opts: FetchOptions = {}): Promise<Response> {
-  const { retries = 3, timeoutMs = 60_000, accept, userAgent } = opts;
+  const { retries = 3, timeoutMs = 60_000, accept, userAgent, headers } = opts;
   let lastErr: unknown;
   for (let attempt = 0; attempt <= retries; attempt++) {
     await throttle(url);
@@ -56,6 +58,7 @@ export async function politeFetch(url: string, opts: FetchOptions = {}): Promise
         headers: {
           "User-Agent": userAgent ?? USER_AGENT,
           ...(accept ? { Accept: accept } : {}),
+          ...(headers ?? {}),
         },
         signal: ctrl.signal,
       });

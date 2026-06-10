@@ -224,4 +224,74 @@ describe.runIf(HAS_DB)("public-surface integrity", () => {
     await correlate();
     expect(await count()).toBe(before);
   });
+
+  // ---- FR-S3 — attribution trust gate ---------------------------------------
+
+  it("untrusted and superseded statements never form correlation edges", async () => {
+    const { and, eq, inArray } = await import("drizzle-orm");
+
+    // (a) caption-derived below the 0.8 confidence gate
+    const [lowConf] = await db
+      .insert(schema.statements)
+      .values({
+        personId,
+        spokenAt: "2026-04-09",
+        channel: "video",
+        fullText: `Testco ${tag} is amazing — low-confidence caption span.`,
+        source: "youtube",
+        sourceUrl: `https://example.test/${tag}/video1`,
+        attributionMethod: "caption_derived",
+        attributionConf: 0.5,
+        needsReview: true,
+        contentHash: h("lowconf"),
+      })
+      .returning({ id: schema.statements.id });
+
+    // (b) official transcript later superseded by a CPD record
+    const [superseded] = await db
+      .insert(schema.statements)
+      .values({
+        personId,
+        spokenAt: "2026-04-09",
+        channel: "remarks",
+        fullText: `Testco ${tag} remarks, fast-source copy.`,
+        source: "app",
+        sourceUrl: `https://example.test/${tag}/app1`,
+        attributionMethod: "official_transcript",
+        attributionConf: 1,
+        supersededBy: statementId, // pretend the CPD twin is the existing stmt
+        contentHash: h("superseded"),
+      })
+      .returning({ id: schema.statements.id });
+
+    const mention = (sid: string, start: number) => ({
+      statementId: sid,
+      companyId,
+      exactQuote: `Testco ${tag}`,
+      charStart: start,
+      charEnd: start + 6,
+      confidence: 0.6,
+      method: "gazetteer",
+    });
+    await db
+      .insert(schema.statementMentions)
+      .values([mention(lowConf.id, 0), mention(superseded.id, 0)]);
+
+    await correlate();
+
+    const rows = await db
+      .select({ id: schema.correlations.id })
+      .from(schema.correlations)
+      .where(
+        and(
+          eq(schema.correlations.transactionId, publicTxnId),
+          inArray(schema.correlations.statementId, [lowConf.id, superseded.id]),
+        ),
+      );
+    expect(rows).toHaveLength(0);
+
+    await db
+      .delete(schema.statements)
+      .where(inArray(schema.statements.id, [lowConf.id, superseded.id]));
+  });
 });
