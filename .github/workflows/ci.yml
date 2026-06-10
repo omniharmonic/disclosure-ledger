@@ -6,7 +6,7 @@ name: ci
 # silently return.
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
 
 concurrency:
@@ -19,7 +19,9 @@ jobs:
     timeout-minutes: 15
     services:
       postgres:
-        image: postgres:16
+        # ECR Public mirror of the official image — Docker Hub pulls from CI
+        # runners hit rate limits/outages (a registry timeout failed a run).
+        image: public.ecr.aws/docker/library/postgres:16
         env:
           POSTGRES_USER: ci
           POSTGRES_PASSWORD: ci

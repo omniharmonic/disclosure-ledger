@@ -9,6 +9,7 @@ import {
   getGainLossLeaders,
 } from "@/lib/queries";
 import { formatDate, formatDollars, formatAmount, typeColor } from "@/lib/format";
+import { safeLoad } from "@/lib/safe-load";
 
 /** ISR — data changes at most once per pipeline run; revalidated on a timer
  *  and on demand via /api/revalidate after each run (ARCHITECTURE §7.2). */
@@ -30,15 +31,31 @@ function StatCard({ label, value, sub, i }: { label: string; value: string; sub?
 }
 
 export default async function HomePage() {
-  const [stats, types, recent, companies, holdings, sectors, gainLoss] = await Promise.all([
-    getStats(),
-    getTypeBreakdown(),
-    listTransactions({ limit: 10, sortBy: "date", order: "desc" }),
-    listCompanies(),
-    getTopHoldings(5),
-    getSectorBreakdown(),
-    getGainLossLeaders(3),
-  ]);
+  const [stats, types, recent, companies, holdings, sectors, gainLoss] = await safeLoad(
+    "dashboard",
+    () =>
+      Promise.all([
+        getStats(),
+        getTypeBreakdown(),
+        listTransactions({ limit: 10, sortBy: "date", order: "desc" }),
+        listCompanies(),
+        getTopHoldings(5),
+        getSectorBreakdown(),
+        getGainLossLeaders(3),
+      ]),
+    [
+      {
+        totalTransactions: 0, totalFilings: 0, earliestDate: null, latestDate: null,
+        lastFilingDate: null, estimatedValueMin: 0, estimatedValueMax: 0,
+      },
+      [],
+      { rows: [], total: 0 },
+      [],
+      [],
+      [],
+      { gainers: [], losers: [] },
+    ],
+  );
   const hasData = stats.totalTransactions > 0;
   const topCompanies = companies.filter((c) => c.correlationCount > 0).slice(0, 5);
   const sectorMax = Math.max(1, ...sectors.map((s) => s.sumMax));

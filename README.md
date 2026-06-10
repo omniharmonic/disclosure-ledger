@@ -82,4 +82,10 @@ get 500 requests/day per IP; `X-API-Key` raises the limit per key.
 - `/api/revalidate?secret=…` — on-demand ISR refresh, called by the pipeline
   after each run (`REVALIDATE_SECRET`).
 - CI (`.github/workflows/ci.yml`) runs typecheck, the full test suite against
-  Postgres 16, and a production build on every push.
+  Postgres 16, and a production build on every PR and push to main.
+- Production schema upgrades: `DATABASE_URL=<neon-url> npm run db:migrate` —
+  the migrations are idempotent and safe on databases originally managed with
+  `drizzle-kit push` (0002 is the explicit catch-up, including the
+  correlation-pair dedupe). Deploys never depend on database state: ISR pages
+  fall back to their empty states if the DB is unreachable or behind, and
+  recover on the next revalidation.

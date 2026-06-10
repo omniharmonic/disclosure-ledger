@@ -30,11 +30,10 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  experimental: {
-    // Compile-time validation of every <Link>/router.push target — all
-    // routes now exist, so the deferral note that used to live here is done.
-    typedRoutes: true,
-  },
+  // Compile-time validation of every <Link>/router.push target — all routes
+  // now exist, so the deferral note that used to live here is done.
+  // (Top-level since Next 15.5; was experimental.typedRoutes.)
+  typedRoutes: true,
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

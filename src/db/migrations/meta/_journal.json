@@ -15,6 +15,13 @@
       "when": 1781061137917,
       "tag": "0001_signature-archive",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781113689328,
+      "tag": "0002_push-managed-catchup",
+      "breakpoints": true
     }
   ]
 }

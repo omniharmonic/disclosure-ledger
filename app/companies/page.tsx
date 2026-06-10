@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { listCompanies } from "@/lib/queries";
+import { safeLoad } from "@/lib/safe-load";
 import { CompaniesTable } from "@/components/CompaniesTable";
 
 export const metadata: Metadata = { title: "Companies" };
@@ -9,7 +10,7 @@ export const metadata: Metadata = { title: "Companies" };
 export const revalidate = 300;
 
 export default async function CompaniesPage() {
-  const companies = await listCompanies();
+  const companies = await safeLoad("companies", listCompanies, []);
   const correlated = companies.filter((c) => c.correlationCount > 0);
   const featured = correlated.slice(0, 6);
 

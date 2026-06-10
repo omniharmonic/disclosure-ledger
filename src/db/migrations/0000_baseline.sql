@@ -1,4 +1,9 @@
-CREATE TABLE "action_targets" (
+-- Baseline schema. Idempotent (IF NOT EXISTS / guarded constraints) so
+-- `npm run db:migrate` is safe on BOTH a fresh database and an existing
+-- push-managed one (e.g. the original Neon deployment). On existing
+-- databases the per-table skips mean later-added columns are NOT created
+-- here — migration 0002 is the explicit catch-up for those.
+CREATE TABLE IF NOT EXISTS "action_targets" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"action_id" uuid NOT NULL,
 	"company_id" uuid,
@@ -7,7 +12,7 @@ CREATE TABLE "action_targets" (
 	"confidence" real NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "actions" (
+CREATE TABLE IF NOT EXISTS "actions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"action_type" text NOT NULL,
 	"occurred_on" date NOT NULL,
@@ -20,7 +25,7 @@ CREATE TABLE "actions" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "api_keys" (
+CREATE TABLE IF NOT EXISTS "api_keys" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"key_hash" text NOT NULL,
 	"label" text,
@@ -30,13 +35,13 @@ CREATE TABLE "api_keys" (
 	CONSTRAINT "api_keys_key_hash_unique" UNIQUE("key_hash")
 );
 --> statement-breakpoint
-CREATE TABLE "api_usage" (
+CREATE TABLE IF NOT EXISTS "api_usage" (
 	"subject" text NOT NULL,
 	"day" date NOT NULL,
 	"count" integer DEFAULT 0 NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "companies" (
+CREATE TABLE IF NOT EXISTS "companies" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" text NOT NULL,
 	"ticker" text,
@@ -54,7 +59,7 @@ CREATE TABLE "companies" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "correlations" (
+CREATE TABLE IF NOT EXISTS "correlations" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"transaction_id" uuid NOT NULL,
 	"event_kind" text NOT NULL,
@@ -71,7 +76,7 @@ CREATE TABLE "correlations" (
 	CONSTRAINT "uq_corr_pair" UNIQUE NULLS NOT DISTINCT("transaction_id","event_kind","statement_id","action_id")
 );
 --> statement-breakpoint
-CREATE TABLE "filings" (
+CREATE TABLE IF NOT EXISTS "filings" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"person_id" uuid,
 	"form_type" text NOT NULL,
@@ -96,7 +101,7 @@ CREATE TABLE "filings" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "graph_edges" (
+CREATE TABLE IF NOT EXISTS "graph_edges" (
 	"id" bigserial PRIMARY KEY NOT NULL,
 	"src_type" text NOT NULL,
 	"src_id" uuid NOT NULL,
@@ -109,7 +114,7 @@ CREATE TABLE "graph_edges" (
 	"valid_to" date
 );
 --> statement-breakpoint
-CREATE TABLE "ingestion_runs" (
+CREATE TABLE IF NOT EXISTS "ingestion_runs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"stage" text NOT NULL,
 	"started_at" timestamp with time zone NOT NULL,
@@ -120,7 +125,7 @@ CREATE TABLE "ingestion_runs" (
 	"status" text DEFAULT 'running' NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "persons" (
+CREATE TABLE IF NOT EXISTS "persons" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"full_name" text NOT NULL,
 	"role" text NOT NULL,
@@ -130,14 +135,14 @@ CREATE TABLE "persons" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "price_cache" (
+CREATE TABLE IF NOT EXISTS "price_cache" (
 	"ticker" text NOT NULL,
 	"price_date" date NOT NULL,
 	"close_price" real NOT NULL,
 	"fetched_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "statement_mentions" (
+CREATE TABLE IF NOT EXISTS "statement_mentions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"statement_id" uuid NOT NULL,
 	"company_id" uuid,
@@ -152,7 +157,7 @@ CREATE TABLE "statement_mentions" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "statements" (
+CREATE TABLE IF NOT EXISTS "statements" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"person_id" uuid,
 	"spoken_at" date NOT NULL,
@@ -170,7 +175,7 @@ CREATE TABLE "statements" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "transactions" (
+CREATE TABLE IF NOT EXISTS "transactions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"filing_id" uuid NOT NULL,
 	"person_id" uuid,
@@ -196,40 +201,64 @@ CREATE TABLE "transactions" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "action_targets" ADD CONSTRAINT "action_targets_action_id_actions_id_fk" FOREIGN KEY ("action_id") REFERENCES "public"."actions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "action_targets" ADD CONSTRAINT "action_targets_company_id_companies_id_fk" FOREIGN KEY ("company_id") REFERENCES "public"."companies"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "correlations" ADD CONSTRAINT "correlations_transaction_id_transactions_id_fk" FOREIGN KEY ("transaction_id") REFERENCES "public"."transactions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "correlations" ADD CONSTRAINT "correlations_statement_id_statements_id_fk" FOREIGN KEY ("statement_id") REFERENCES "public"."statements"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "correlations" ADD CONSTRAINT "correlations_action_id_actions_id_fk" FOREIGN KEY ("action_id") REFERENCES "public"."actions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "filings" ADD CONSTRAINT "filings_person_id_persons_id_fk" FOREIGN KEY ("person_id") REFERENCES "public"."persons"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "statement_mentions" ADD CONSTRAINT "statement_mentions_statement_id_statements_id_fk" FOREIGN KEY ("statement_id") REFERENCES "public"."statements"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "statement_mentions" ADD CONSTRAINT "statement_mentions_company_id_companies_id_fk" FOREIGN KEY ("company_id") REFERENCES "public"."companies"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "statements" ADD CONSTRAINT "statements_person_id_persons_id_fk" FOREIGN KEY ("person_id") REFERENCES "public"."persons"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "transactions" ADD CONSTRAINT "transactions_filing_id_filings_id_fk" FOREIGN KEY ("filing_id") REFERENCES "public"."filings"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "transactions" ADD CONSTRAINT "transactions_person_id_persons_id_fk" FOREIGN KEY ("person_id") REFERENCES "public"."persons"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "transactions" ADD CONSTRAINT "transactions_company_id_companies_id_fk" FOREIGN KEY ("company_id") REFERENCES "public"."companies"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "idx_action_target_co" ON "action_targets" USING btree ("company_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "uq_actions_source_ref" ON "actions" USING btree ("source","source_ref");--> statement-breakpoint
-CREATE INDEX "idx_action_date" ON "actions" USING btree ("occurred_on");--> statement-breakpoint
-CREATE UNIQUE INDEX "uq_api_usage" ON "api_usage" USING btree ("subject","day");--> statement-breakpoint
-CREATE UNIQUE INDEX "uq_companies_ticker" ON "companies" USING btree ("ticker");--> statement-breakpoint
-CREATE INDEX "idx_companies_name" ON "companies" USING btree ("name");--> statement-breakpoint
-CREATE INDEX "idx_corr_txn" ON "correlations" USING btree ("transaction_id");--> statement-breakpoint
-CREATE INDEX "idx_corr_score" ON "correlations" USING btree ("signal_score");--> statement-breakpoint
-CREATE UNIQUE INDEX "uq_filings_pdf_hash" ON "filings" USING btree ("pdf_hash");--> statement-breakpoint
-CREATE UNIQUE INDEX "uq_filings_oge_unid" ON "filings" USING btree ("oge_unid");--> statement-breakpoint
-CREATE INDEX "idx_filings_date" ON "filings" USING btree ("filing_date");--> statement-breakpoint
-CREATE INDEX "idx_filings_status" ON "filings" USING btree ("status");--> statement-breakpoint
-CREATE INDEX "idx_edges_src" ON "graph_edges" USING btree ("src_type","src_id");--> statement-breakpoint
-CREATE INDEX "idx_edges_dst" ON "graph_edges" USING btree ("dst_type","dst_id");--> statement-breakpoint
-CREATE INDEX "idx_edges_rel" ON "graph_edges" USING btree ("rel_type");--> statement-breakpoint
-CREATE UNIQUE INDEX "uq_price_cache" ON "price_cache" USING btree ("ticker","price_date");--> statement-breakpoint
-CREATE INDEX "idx_mention_co" ON "statement_mentions" USING btree ("company_id");--> statement-breakpoint
-CREATE INDEX "idx_mention_stmt" ON "statement_mentions" USING btree ("statement_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "uq_statements_content_hash" ON "statements" USING btree ("content_hash");--> statement-breakpoint
-CREATE INDEX "idx_stmt_date" ON "statements" USING btree ("spoken_at");--> statement-breakpoint
-CREATE INDEX "idx_stmt_source" ON "statements" USING btree ("source");--> statement-breakpoint
-CREATE INDEX "idx_txn_company" ON "transactions" USING btree ("company_id");--> statement-breakpoint
-CREATE INDEX "idx_txn_date" ON "transactions" USING btree ("transaction_date");--> statement-breakpoint
-CREATE INDEX "idx_txn_filing" ON "transactions" USING btree ("filing_id");--> statement-breakpoint
-CREATE INDEX "idx_txn_type" ON "transactions" USING btree ("transaction_type");
+DO $$ BEGIN
+ ALTER TABLE "action_targets" ADD CONSTRAINT "action_targets_action_id_actions_id_fk" FOREIGN KEY ("action_id") REFERENCES "public"."actions"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null; END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "action_targets" ADD CONSTRAINT "action_targets_company_id_companies_id_fk" FOREIGN KEY ("company_id") REFERENCES "public"."companies"("id") ON DELETE no action ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null; END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "correlations" ADD CONSTRAINT "correlations_transaction_id_transactions_id_fk" FOREIGN KEY ("transaction_id") REFERENCES "public"."transactions"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null; END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "correlations" ADD CONSTRAINT "correlations_statement_id_statements_id_fk" FOREIGN KEY ("statement_id") REFERENCES "public"."statements"("id") ON DELETE no action ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null; END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "correlations" ADD CONSTRAINT "correlations_action_id_actions_id_fk" FOREIGN KEY ("action_id") REFERENCES "public"."actions"("id") ON DELETE no action ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null; END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "filings" ADD CONSTRAINT "filings_person_id_persons_id_fk" FOREIGN KEY ("person_id") REFERENCES "public"."persons"("id") ON DELETE no action ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null; END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "statement_mentions" ADD CONSTRAINT "statement_mentions_statement_id_statements_id_fk" FOREIGN KEY ("statement_id") REFERENCES "public"."statements"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null; END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "statement_mentions" ADD CONSTRAINT "statement_mentions_company_id_companies_id_fk" FOREIGN KEY ("company_id") REFERENCES "public"."companies"("id") ON DELETE no action ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null; END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "statements" ADD CONSTRAINT "statements_person_id_persons_id_fk" FOREIGN KEY ("person_id") REFERENCES "public"."persons"("id") ON DELETE no action ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null; END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "transactions" ADD CONSTRAINT "transactions_filing_id_filings_id_fk" FOREIGN KEY ("filing_id") REFERENCES "public"."filings"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null; END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "transactions" ADD CONSTRAINT "transactions_person_id_persons_id_fk" FOREIGN KEY ("person_id") REFERENCES "public"."persons"("id") ON DELETE no action ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null; END $$;--> statement-breakpoint
+DO $$ BEGIN
+ ALTER TABLE "transactions" ADD CONSTRAINT "transactions_company_id_companies_id_fk" FOREIGN KEY ("company_id") REFERENCES "public"."companies"("id") ON DELETE no action ON UPDATE no action;
+EXCEPTION WHEN duplicate_object THEN null; END $$;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_action_target_co" ON "action_targets" USING btree ("company_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "uq_actions_source_ref" ON "actions" USING btree ("source","source_ref");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_action_date" ON "actions" USING btree ("occurred_on");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "uq_api_usage" ON "api_usage" USING btree ("subject","day");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "uq_companies_ticker" ON "companies" USING btree ("ticker");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_companies_name" ON "companies" USING btree ("name");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_corr_txn" ON "correlations" USING btree ("transaction_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_corr_score" ON "correlations" USING btree ("signal_score");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "uq_filings_pdf_hash" ON "filings" USING btree ("pdf_hash");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "uq_filings_oge_unid" ON "filings" USING btree ("oge_unid");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_filings_date" ON "filings" USING btree ("filing_date");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_filings_status" ON "filings" USING btree ("status");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_edges_src" ON "graph_edges" USING btree ("src_type","src_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_edges_dst" ON "graph_edges" USING btree ("dst_type","dst_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_edges_rel" ON "graph_edges" USING btree ("rel_type");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "uq_price_cache" ON "price_cache" USING btree ("ticker","price_date");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_mention_co" ON "statement_mentions" USING btree ("company_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_mention_stmt" ON "statement_mentions" USING btree ("statement_id");--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "uq_statements_content_hash" ON "statements" USING btree ("content_hash");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_stmt_date" ON "statements" USING btree ("spoken_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_stmt_source" ON "statements" USING btree ("source");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_txn_company" ON "transactions" USING btree ("company_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_txn_date" ON "transactions" USING btree ("transaction_date");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_txn_filing" ON "transactions" USING btree ("filing_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_txn_type" ON "transactions" USING btree ("transaction_type");

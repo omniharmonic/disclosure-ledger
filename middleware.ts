@@ -17,8 +17,19 @@ export function middleware(req: NextRequest) {
   const header = req.headers.get("authorization") ?? "";
   const [scheme, encoded] = header.split(" ");
   if (scheme === "Basic" && encoded) {
-    const [u, p] = Buffer.from(encoded, "base64").toString().split(":");
-    if (u === user && p === password) return NextResponse.next();
+    // atob, not Buffer — middleware executes on the Edge runtime.
+    let decoded = "";
+    try {
+      decoded = atob(encoded);
+    } catch {
+      /* malformed base64 → fall through to the 401 */
+    }
+    const idx = decoded.indexOf(":");
+    if (idx > 0) {
+      const u = decoded.slice(0, idx);
+      const p = decoded.slice(idx + 1);
+      if (u === user && p === password) return NextResponse.next();
+    }
   }
   return new NextResponse("Authentication required", {
     status: 401,
