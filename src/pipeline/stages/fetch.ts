@@ -14,26 +14,14 @@ import { filings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { fetchBytes } from "../lib/http";
 import { ensurePresident } from "../lib/persons";
+import { verifyPdfSignature } from "../lib/pdf-signature";
+import { archivePdf } from "../lib/object-storage";
 import type { FilingCandidate } from "./discover";
 
 const PDF_DIR = join(process.cwd(), "data", "pdfs");
 
 function sha256(buf: Buffer): string {
   return createHash("sha256").update(buf).digest("hex");
-}
-
-/**
- * Detect an embedded PDF digital-signature structure (OGE filings carry a
- * PKCS#7 signature from the certifying official). Presence only — recorded
- * as provenance (FR-T3 first step); cryptographic chain verification is a
- * separate, deferred step and `signature_verified` stays null until then.
- */
-export function detectSignature(bytes: Buffer): boolean {
-  const head = bytes.toString("latin1");
-  return (
-    head.includes("/ByteRange") &&
-    (head.includes("adbe.pkcs7") || head.includes("ETSI.CAdES") || head.includes("/Sig"))
-  );
 }
 
 async function hashExists(hash: string): Promise<boolean> {
@@ -72,6 +60,21 @@ export async function fetchFilings(candidates: FilingCandidate[]): Promise<Fetch
       const path = join(PDF_DIR, `${hash}.pdf`);
       await writeFile(path, bytes);
 
+      // Cryptographic signature verification (FR-T3): document integrity
+      // against the embedded certificate. Never blocks ingestion — the
+      // result is provenance, surfaced on the filing page.
+      const sig = await verifyPdfSignature(bytes);
+      if (sig.present) {
+        console.log(
+          `[fetch]   signature: ${sig.verified === true ? "verified" : sig.verified === false ? "FAILED" : "present, not evaluable"}` +
+            (sig.signer ? ` (signer: ${sig.signer})` : "") +
+            (sig.note ? ` — ${sig.note}` : ""),
+        );
+      }
+
+      // Durable provenance mirror (W-9) — no-op unless PDF_ARCHIVE_* is set.
+      const archiveUrl = await archivePdf(hash, bytes);
+
       await db.insert(filings).values({
         personId,
         formType: c.formType,
@@ -81,7 +84,10 @@ export async function fetchFilings(candidates: FilingCandidate[]): Promise<Fetch
         sourceDomain: c.sourceDomain,
         pdfHash: hash,
         rawPdfPath: path,
-        signaturePresent: detectSignature(bytes),
+        archiveUrl,
+        signaturePresent: sig.present,
+        signatureVerified: sig.verified,
+        signatureSigner: sig.signer,
         status: "pending",
       });
       result.fetched++;

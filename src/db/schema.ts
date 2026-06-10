@@ -80,6 +80,8 @@ export const filings = pgTable(
     sourceDomain: text("source_domain"),
     pdfHash: text("pdf_hash").notNull(), // SHA-256
     rawPdfPath: text("raw_pdf_path"),
+    /** Durable mirror of the raw PDF (S3-compatible object storage, W-9). */
+    archiveUrl: text("archive_url"),
     pageCount: integer("page_count"),
     transactionCount: integer("transaction_count"),
     /**
@@ -89,7 +91,16 @@ export const filings = pgTable(
      * is never presented as verification.
      */
     signaturePresent: boolean("signature_present"),
+    /**
+     * Cryptographic verification result: true = CMS digest + signature
+     * verified against the embedded certificate (document integrity intact);
+     * false = signature present but FAILED verification; null = no signature
+     * or not evaluable. Chain-to-root validation is out of scope and the UI
+     * copy says "integrity verified", never "identity verified".
+     */
     signatureVerified: boolean("signature_verified"),
+    /** Subject CN of the embedded signing certificate, when readable. */
+    signatureSigner: text("signature_signer"),
     parseMethod: text("parse_method"), // heuristic-ocr|heuristic-embedded|llm_adjudicated|skipped-278e
     parseConfidence: real("parse_confidence"), // 0..1
     status: text("status").default("pending").notNull(), // pending|parsed|review|published|superseded
