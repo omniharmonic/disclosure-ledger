@@ -3,7 +3,9 @@ import { getGraph } from "@/lib/queries";
 import { GraphExplorer } from "@/components/GraphExplorer";
 
 export const metadata: Metadata = { title: "Graph" };
-export const dynamic = "force-dynamic";
+/** ISR — data changes at most once per pipeline run; revalidated on a timer
+ *  and on demand via /api/revalidate after each run (ARCHITECTURE §7.2). */
+export const revalidate = 300;
 
 export default async function GraphPage() {
   const { nodes, links } = await getGraph();

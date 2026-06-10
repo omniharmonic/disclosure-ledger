@@ -17,8 +17,23 @@ const PX_PER_DAY = 7;
 /** A wide, horizontally-scrollable three-lane timeline. Click a marker to pin it. */
 export function TimelineView({ events }: { events: TimelineEvent[] }) {
   const [pinned, setPinned] = useState<TimelineEvent | null>(null);
+  const [laneOn, setLaneOn] = useState<Record<string, boolean>>({
+    trade: true,
+    statement: true,
+    action: true,
+  });
+  const [correlatedOnly, setCorrelatedOnly] = useState(false);
+
+  const filtered = useMemo(
+    () =>
+      events.filter(
+        (e) => laneOn[e.kind] && (!correlatedOnly || e.related.length > 0),
+      ),
+    [events, laneOn, correlatedOnly],
+  );
 
   const { shown, min, width, months } = useMemo(() => {
+    const events = filtered;
     const tradeTimes = events
       .filter((e) => e.kind === "trade")
       .map((e) => Date.parse(e.date))
@@ -49,7 +64,7 @@ export function TimelineView({ events }: { events: TimelineEvent[] }) {
       d.setUTCMonth(d.getUTCMonth() + 1);
     }
     return { shown: inWindow, min: lo, width: w, months: m };
-  }, [events]);
+  }, [filtered]);
 
   const span = useMemo(() => {
     const times = shown.map((e) => Date.parse(e.date));
@@ -68,7 +83,36 @@ export function TimelineView({ events }: { events: TimelineEvent[] }) {
 
   return (
     <div className="space-y-3">
-      <div className="overflow-x-auto rounded-lg border border-[var(--color-rule)] bg-[var(--color-card)]">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
+        {LANES.map((lane) => (
+          <label key={lane.kind} className="flex cursor-pointer items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={laneOn[lane.kind]}
+              onChange={(e) => setLaneOn({ ...laneOn, [lane.kind]: e.target.checked })}
+              className="accent-[var(--color-accent)]"
+            />
+            <span style={{ color: lane.color }} className="font-mono font-semibold uppercase">
+              {lane.label}
+            </span>
+          </label>
+        ))}
+        <label className="flex cursor-pointer items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={correlatedOnly}
+            onChange={(e) => setCorrelatedOnly(e.target.checked)}
+            className="accent-[var(--color-accent)]"
+          />
+          Only events with correlations
+        </label>
+      </div>
+
+      <div
+        role="region"
+        aria-label="Interactive timeline of trades, statements, and official actions — a table equivalent follows below"
+        tabIndex={0}
+        className="overflow-x-auto rounded-lg border border-[var(--color-rule)] bg-[var(--color-card)] focus-visible:outline-2 focus-visible:outline-[var(--color-accent)]">
         <div className="relative" style={{ width, height: 248 }}>
           {months.map((m) => (
             <div
@@ -200,6 +244,55 @@ export function TimelineView({ events }: { events: TimelineEvent[] }) {
           </p>
         )}
       </div>
+
+      {/* Accessible tabular equivalent (WCAG NFR / FR-W6) — the same events,
+          readable without the visual timeline. */}
+      <details className="rounded-lg border border-[var(--color-rule)] bg-[var(--color-card)]">
+        <summary className="cursor-pointer px-4 py-2.5 text-sm font-medium">
+          Table view — {shown.length} events (accessible equivalent)
+        </summary>
+        <div className="max-h-96 overflow-y-auto border-t border-[var(--color-rule)]">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="sticky top-0 border-b border-[var(--color-rule)] bg-[var(--color-card)] text-left text-[0.7rem] uppercase tracking-wide text-[var(--color-muted)]">
+                <th scope="col" className="px-3 py-2 font-medium">Date</th>
+                <th scope="col" className="px-3 py-2 font-medium">Kind</th>
+                <th scope="col" className="px-3 py-2 font-medium">Event</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">Correlations</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...shown]
+                .sort((a, b) => b.date.localeCompare(a.date))
+                .map((e) => (
+                  <tr key={`${e.kind}:${e.id}`} className="border-b border-[var(--color-rule-soft)] last:border-0">
+                    <td className="px-3 py-2 tabular whitespace-nowrap">{formatDate(e.date)}</td>
+                    <td className="px-3 py-2">
+                      <span
+                        className="font-mono text-[0.65rem] uppercase"
+                        style={{ color: LANES.find((l) => l.kind === e.kind)?.color }}
+                      >
+                        {e.kind}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2">
+                      {e.internal ? (
+                        <Link href={e.href} className="hover:underline">
+                          {e.label}
+                        </Link>
+                      ) : (
+                        <a href={e.href} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                          {e.label}
+                        </a>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular">{e.related.length || "—"}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </div>
   );
 }

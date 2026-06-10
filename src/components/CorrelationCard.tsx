@@ -3,6 +3,8 @@ import { formatDate } from "@/lib/format";
 
 export interface CorrelationCardData {
   eventKind: "statement" | "action";
+  /** Distinguishes official acts from administration communications. */
+  actionType?: string | null;
   daysGap: number;
   signalScore: number;
   components: Record<string, number>;
@@ -35,6 +37,18 @@ function gapPhrase(days: number): string {
   return days > 0 ? `${days} days after the trade` : `${-days} days before the trade`;
 }
 
+/**
+ * Honest event labelling: a White House fact sheet or briefing is the
+ * administration *talking*, not government *acting* — presenting it as an
+ * "Official action" overstates it (editorial-discipline rule, PRD §8).
+ */
+function eventLabel(kind: "statement" | "action", actionType?: string | null): string {
+  if (kind === "statement") return "Public statement";
+  if (actionType?.startsWith("white_house")) return "Administration communication";
+  if (actionType === "contract") return "Federal contract award";
+  return "Official action";
+}
+
 /** One scored trade ↔ event correlation, written out in full. */
 export function CorrelationCard({ c }: { c: CorrelationCardData }) {
   return (
@@ -42,7 +56,7 @@ export function CorrelationCard({ c }: { c: CorrelationCardData }) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="kicker">
-            {c.eventKind === "statement" ? "Public statement" : "Official action"}
+            {eventLabel(c.eventKind, c.actionType)}
             {" · "}
             {gapPhrase(c.daysGap)}
           </div>

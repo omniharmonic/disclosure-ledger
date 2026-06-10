@@ -3,7 +3,9 @@ import { getTimelineEvents } from "@/lib/queries";
 import { TimelineView } from "@/components/TimelineView";
 
 export const metadata: Metadata = { title: "Timeline" };
-export const dynamic = "force-dynamic";
+/** ISR — data changes at most once per pipeline run; revalidated on a timer
+ *  and on demand via /api/revalidate after each run (ARCHITECTURE §7.2). */
+export const revalidate = 300;
 
 export default async function TimelinePage() {
   const events = await getTimelineEvents();

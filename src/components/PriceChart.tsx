@@ -66,12 +66,12 @@ export function PriceChart({
             tick={{ fontSize: 10, fontFamily: "var(--font-mono)" }}
             minTickGap={48}
             tickFormatter={(d: string) => d.slice(2, 7)}
-            stroke="#857b6d"
+            stroke="#6e6557"
           />
           <YAxis
             tick={{ fontSize: 10, fontFamily: "var(--font-mono)" }}
             width={48}
-            stroke="#857b6d"
+            stroke="#6e6557"
             tickFormatter={(v: number) => `$${v}`}
             domain={["auto", "auto"]}
           />

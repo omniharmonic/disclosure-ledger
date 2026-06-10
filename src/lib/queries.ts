@@ -321,6 +321,7 @@ export async function getCompany(ticker: string) {
       actionTitle: actions.title,
       actionDate: actions.occurredOn,
       actionUrl: actions.sourceUrl,
+      actionType: actions.actionType,
     })
     .from(correlations)
     .innerJoin(transactions, eq(correlations.transactionId, transactions.id))
@@ -344,6 +345,7 @@ export async function getCompany(ticker: string) {
       id: r.id,
       transactionId: r.transactionId,
       eventKind: r.eventKind as "statement" | "action",
+      actionType: r.actionType ?? null,
       daysGap: r.daysGap,
       signalScore: r.signalScore,
       components: (r.components ?? {}) as Record<string, number>,
@@ -362,6 +364,8 @@ export async function getCompany(ticker: string) {
 export interface CorrelationView {
   id: string;
   eventKind: "statement" | "action";
+  /** The action's type — distinguishes official acts from administration communications. */
+  actionType: string | null;
   daysGap: number;
   signalScore: number;
   components: Record<string, number>;
@@ -386,6 +390,7 @@ export async function getCorrelations(transactionId: string): Promise<Correlatio
       actionTitle: actions.title,
       actionDate: actions.occurredOn,
       actionUrl: actions.sourceUrl,
+      actionType: actions.actionType,
     })
     .from(correlations)
     .innerJoin(transactions, eq(correlations.transactionId, transactions.id))
@@ -405,6 +410,7 @@ export async function getCorrelations(transactionId: string): Promise<Correlatio
   return rows.map((r) => ({
     id: r.id,
     eventKind: r.eventKind as "statement" | "action",
+    actionType: r.actionType ?? null,
     daysGap: r.daysGap,
     signalScore: r.signalScore,
     components: (r.components ?? {}) as Record<string, number>,
@@ -447,37 +453,56 @@ export async function getGraph(): Promise<{ nodes: GraphNode[]; links: GraphLink
   const subs = new Map<string, string>();
   const key = (t: string, id: string) => `${t}:${id}`;
 
+  // Load label data only for ids that actually appear in the graph — never
+  // the full tables (the statement corpus alone can be tens of thousands of
+  // rows the graph does not reference).
+  const chunks = (set: Set<string>, n = 500) => {
+    const all = [...set];
+    const out: string[][] = [];
+    for (let i = 0; i < all.length; i += n) out.push(all.slice(i, i + n));
+    return out;
+  };
   if (ids.person?.size) {
-    for (const p of await db.select().from(persons)) {
-      labels.set(key("person", p.id), p.fullName);
-      subs.set(key("person", p.id), p.role);
+    for (const chunk of chunks(ids.person)) {
+      for (const p of await db.select().from(persons).where(inArray(persons.id, chunk))) {
+        labels.set(key("person", p.id), p.fullName);
+        subs.set(key("person", p.id), p.role);
+      }
     }
   }
   if (ids.company?.size) {
-    for (const c of await db.select().from(companies)) {
-      labels.set(key("company", c.id), c.ticker ?? c.name);
-      details.set(key("company", c.id), c.oneLiner ?? c.name);
-      subs.set(key("company", c.id), [c.sector, c.industry].filter(Boolean).join(" · "));
+    for (const chunk of chunks(ids.company)) {
+      for (const c of await db.select().from(companies).where(inArray(companies.id, chunk))) {
+        labels.set(key("company", c.id), c.ticker ?? c.name);
+        details.set(key("company", c.id), c.oneLiner ?? c.name);
+        subs.set(key("company", c.id), [c.sector, c.industry].filter(Boolean).join(" · "));
+      }
     }
   }
   if (ids.filing?.size) {
-    for (const f of await db.select().from(filings)) {
-      labels.set(key("filing", f.id), `${f.formType} ${f.filingDate}`);
-      subs.set(key("filing", f.id), `filed ${f.filingDate}`);
+    for (const chunk of chunks(ids.filing)) {
+      for (const f of await db.select().from(filings).where(inArray(filings.id, chunk))) {
+        labels.set(key("filing", f.id), `${f.formType} ${f.filingDate}`);
+        subs.set(key("filing", f.id), `filed ${f.filingDate}`);
+      }
     }
   }
   if (ids.statement?.size) {
-    for (const s of await db.select().from(statements)) {
-      labels.set(key("statement", s.id), s.fullText.slice(0, 44));
-      details.set(key("statement", s.id), s.fullText.slice(0, 360));
-      subs.set(key("statement", s.id), `${s.channel ?? "statement"} · ${s.spokenAt}`);
+    for (const chunk of chunks(ids.statement)) {
+      for (const s of await db.select().from(statements).where(inArray(statements.id, chunk))) {
+        labels.set(key("statement", s.id), s.fullText.slice(0, 44));
+        details.set(key("statement", s.id), s.fullText.slice(0, 360));
+        subs.set(key("statement", s.id), `${s.channel ?? "statement"} · ${s.spokenAt}`);
+      }
     }
   }
   if (ids.action?.size) {
-    for (const a of await db.select().from(actions)) {
-      labels.set(key("action", a.id), a.title.slice(0, 52));
-      details.set(key("action", a.id), a.title);
-      subs.set(key("action", a.id), `${a.actionType.replace(/_/g, " ")} · ${a.occurredOn}`);
+    for (const chunk of chunks(ids.action)) {
+      for (const a of await db.select().from(actions).where(inArray(actions.id, chunk))) {
+        labels.set(key("action", a.id), a.title.slice(0, 52));
+        details.set(key("action", a.id), a.title);
+        subs.set(key("action", a.id), `${a.actionType.replace(/_/g, " ")} · ${a.occurredOn}`);
+      }
     }
   }
 
@@ -543,8 +568,10 @@ export async function getTimelineEvents(limit = 600): Promise<TimelineEvent[]> {
     .orderBy(desc(transactions.transactionDate))
     .limit(limit);
 
+  // DISTINCT tuple + date ordering: which statements appear is deterministic
+  // (the most recent mentioned ones), not an arbitrary id-ordered subset.
   const stmts = await db
-    .selectDistinctOn([statements.id], {
+    .selectDistinct({
       id: statements.id,
       date: statements.spokenAt,
       text: statements.fullText,
@@ -552,7 +579,7 @@ export async function getTimelineEvents(limit = 600): Promise<TimelineEvent[]> {
     })
     .from(statementMentions)
     .innerJoin(statements, eq(statementMentions.statementId, statements.id))
-    .orderBy(statements.id, desc(statements.spokenAt))
+    .orderBy(desc(statements.spokenAt), statements.id)
     .limit(limit);
 
   const acts = await db
@@ -874,6 +901,108 @@ export async function* iterateAllTransactions(pageSize = 1000) {
     if (rows.length < Math.min(200, pageSize)) return;
     page++;
   }
+}
+
+export interface HoldingAggregate {
+  ticker: string | null;
+  name: string;
+  tradeCount: number;
+  sumMin: number;
+  sumMax: number;
+}
+
+/** Largest disclosed positions by summed statutory band range (FR-W1). */
+export async function getTopHoldings(limitN = 5): Promise<HoldingAggregate[]> {
+  const rows = await db
+    .select({
+      ticker: companies.ticker,
+      name: companies.name,
+      tradeCount: count(transactions.id),
+      sumMin: sql<number>`coalesce(sum(${transactions.amountMin}), 0)`,
+      sumMax: sql<number>`coalesce(sum(coalesce(${transactions.amountMax}, ${transactions.amountMin})), 0)`,
+    })
+    .from(transactions)
+    .innerJoin(filings, eq(transactions.filingId, filings.id))
+    .innerJoin(companies, eq(transactions.companyId, companies.id))
+    .where(inArray(filings.status, [...PUBLIC_FILING_STATUSES]))
+    .groupBy(companies.id)
+    .orderBy(desc(sql`sum(coalesce(${transactions.amountMax}, ${transactions.amountMin}))`))
+    .limit(limitN);
+  return rows.map((r) => ({
+    ...r,
+    tradeCount: Number(r.tradeCount),
+    sumMin: Number(r.sumMin),
+    sumMax: Number(r.sumMax),
+  }));
+}
+
+export interface SectorAggregate {
+  sector: string;
+  tradeCount: number;
+  sumMin: number;
+  sumMax: number;
+}
+
+/** Disclosed-trade concentration by sector (FR-W1, UC4). */
+export async function getSectorBreakdown(): Promise<SectorAggregate[]> {
+  const rows = await db
+    .select({
+      sector: sql<string>`coalesce(${companies.sector}, 'Unresolved / non-equity')`,
+      tradeCount: count(transactions.id),
+      sumMin: sql<number>`coalesce(sum(${transactions.amountMin}), 0)`,
+      sumMax: sql<number>`coalesce(sum(coalesce(${transactions.amountMax}, ${transactions.amountMin})), 0)`,
+    })
+    .from(transactions)
+    .innerJoin(filings, eq(transactions.filingId, filings.id))
+    .leftJoin(companies, eq(transactions.companyId, companies.id))
+    .where(inArray(filings.status, [...PUBLIC_FILING_STATUSES]))
+    .groupBy(sql`coalesce(${companies.sector}, 'Unresolved / non-equity')`)
+    .orderBy(desc(sql`sum(coalesce(${transactions.amountMax}, ${transactions.amountMin}))`));
+  return rows.map((r) => ({
+    ...r,
+    tradeCount: Number(r.tradeCount),
+    sumMin: Number(r.sumMin),
+    sumMax: Number(r.sumMax),
+  }));
+}
+
+export interface GainLossLeader {
+  id: string;
+  ticker: string;
+  transactionType: string;
+  transactionDate: string;
+  gainLossPct: number;
+}
+
+/** Best/worst price moves since the trade (FR-W1 gain/loss leaders). */
+export async function getGainLossLeaders(perSide = 3): Promise<{
+  gainers: GainLossLeader[];
+  losers: GainLossLeader[];
+}> {
+  const base = () =>
+    db
+      .select({
+        id: transactions.id,
+        ticker: sql<string>`${companies.ticker}`,
+        transactionType: transactions.transactionType,
+        transactionDate: transactions.transactionDate,
+        gainLossPct: sql<number>`${transactions.gainLossPct}`,
+      })
+      .from(transactions)
+      .innerJoin(filings, eq(transactions.filingId, filings.id))
+      .innerJoin(companies, eq(transactions.companyId, companies.id))
+      .where(
+        and(
+          inArray(filings.status, [...PUBLIC_FILING_STATUSES]),
+          sql`${transactions.gainLossPct} is not null`,
+        ),
+      );
+  const gainers = await base().orderBy(desc(transactions.gainLossPct)).limit(perSide);
+  const losers = await base().orderBy(asc(transactions.gainLossPct)).limit(perSide);
+  return {
+    gainers: gainers.filter((g) => g.gainLossPct > 0),
+    losers: losers.filter((l) => l.gainLossPct < 0),
+  };
 }
 
 /** Headline statistics for the dashboard. */
