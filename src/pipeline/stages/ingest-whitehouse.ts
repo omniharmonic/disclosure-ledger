@@ -12,10 +12,12 @@
  * The body text is stored in `summary` so mention detection can scan it: a
  * company is usually named in the body, not the headline.
  */
+import { createHash } from "node:crypto";
 import { db } from "@/db";
-import { actions } from "@/db/schema";
+import { actions, statements } from "@/db/schema";
 import { sql } from "drizzle-orm";
 import { fetchText } from "../lib/http";
+import { ensurePresident } from "../lib/persons";
 
 const NEWS_INDEXES = [
   "https://www.whitehouse.gov/news/",
@@ -76,12 +78,14 @@ function categoryOf(url: string): string {
 
 export interface WhiteHouseResult {
   ingested: number;
+  remarksIngested: number;
   skipped: number;
   errors: string[];
 }
 
 export async function ingestWhiteHouse(): Promise<WhiteHouseResult> {
-  const result: WhiteHouseResult = { ingested: 0, skipped: 0, errors: [] };
+  const result: WhiteHouseResult = { ingested: 0, remarksIngested: 0, skipped: 0, errors: [] };
+  const personId = await ensurePresident();
 
   // Collect candidate article URLs from the news indexes.
   const urls = new Set<string>();
@@ -114,10 +118,48 @@ export async function ingestWhiteHouse(): Promise<WhiteHouseResult> {
         result.skipped++;
         continue;
       }
+      const category = categoryOf(url);
+
+      if (category === "white_house_remarks") {
+        // Remarks are the President SPEAKING — they belong in `statements`,
+        // not `actions`: storing them as actions made the UI present his own
+        // words as "Official action", conflating speech with government acts.
+        // Only the President's own remarks qualify; VP/officials' remarks are
+        // skipped rather than misattributed.
+        if (!/president\s+trump|president\s+donald/i.test(title)) {
+          result.skipped++;
+          continue;
+        }
+        const contentHash = createHash("sha256").update(`wh-remarks:${url}`).digest("hex");
+        const inserted = await db
+          .insert(statements)
+          .values({
+            personId,
+            spokenAt: date,
+            channel: "white_house_remarks",
+            venue: title.slice(0, 200),
+            fullText: body,
+            source: "white_house",
+            sourceUrl: url,
+            sourceRef: url.replace("https://www.whitehouse.gov", ""),
+            // An official White House transcript of the President's remarks.
+            // Confidence below 1: remarks pages can include Q&A exchanges
+            // whose speakers are not yet segmented.
+            attributionMethod: "official_transcript",
+            attributionConf: 0.85,
+            contentHash,
+          })
+          .onConflictDoNothing({ target: statements.contentHash })
+          .returning({ id: statements.id });
+        if (inserted.length > 0) result.remarksIngested++;
+        else result.skipped++;
+        continue;
+      }
+
       const inserted = await db
         .insert(actions)
         .values({
-          actionType: categoryOf(url),
+          actionType: category,
           occurredOn: date,
           title,
           summary: body,
@@ -135,7 +177,8 @@ export async function ingestWhiteHouse(): Promise<WhiteHouseResult> {
   }
 
   console.log(
-    `[ingest-whitehouse] ${result.ingested} new White House statements, ${result.skipped} skipped`,
+    `[ingest-whitehouse] ${result.ingested} communications (actions), ` +
+      `${result.remarksIngested} presidential remarks (statements), ${result.skipped} skipped`,
   );
   return result;
 }

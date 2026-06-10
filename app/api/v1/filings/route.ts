@@ -1,14 +1,18 @@
 /** GET /api/v1/filings — public list of parsed filings. */
+import type { NextRequest } from "next/server";
 import { listFilings } from "@/lib/queries";
-import { apiOk, apiError } from "@/lib/api";
+import { apiOk, apiServerError } from "@/lib/api";
+import { enforceRateLimit } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const gate = await enforceRateLimit(req);
+  if (gate.rejection) return gate.rejection;
   try {
     const rows = await listFilings();
-    return apiOk(rows, { total: rows.length });
+    return apiOk(rows, { total: rows.length }, gate.headers);
   } catch (err) {
-    return apiError(`query failed: ${String(err)}`, 500);
+    return apiServerError("filings", err);
   }
 }

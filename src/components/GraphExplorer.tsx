@@ -121,6 +121,19 @@ export function GraphExplorer({
 
   const selected = selectedId ? nodes.find((n) => n.id === selectedId) ?? null : null;
 
+  // Edges resolved to labels for the accessible tabular equivalent.
+  const edgeRows = useMemo(() => {
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    return data.links
+      .map((l) => {
+        const s = typeof l.source === "string" ? l.source : (l.source as FGNode).id;
+        const t = typeof l.target === "string" ? l.target : (l.target as FGNode).id;
+        return { src: byId.get(s), dst: byId.get(t), rel: l.rel, weight: l.weight ?? 1 };
+      })
+      .filter((r) => r.src && r.dst)
+      .sort((a, b) => b.weight - a.weight);
+  }, [data, nodes]);
+
   if (nodes.length === 0) {
     return (
       <p className="rounded border border-dashed border-[var(--color-rule)] p-10 text-center text-sm text-[var(--color-muted)]">
@@ -130,6 +143,7 @@ export function GraphExplorer({
   }
 
   return (
+    <div className="space-y-4">
     <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
       <div className="overflow-hidden rounded-lg border border-[var(--color-rule)] bg-[var(--color-card)]">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-rule)] px-4 py-2.5">
@@ -249,6 +263,49 @@ export function GraphExplorer({
           </div>
         )}
       </aside>
+    </div>
+
+      {/* Accessible tabular equivalent (WCAG NFR / FR-W7) — every visible
+          relationship, readable without the canvas. */}
+      <details className="rounded-lg border border-[var(--color-rule)] bg-[var(--color-card)]">
+        <summary className="cursor-pointer px-4 py-2.5 text-sm font-medium">
+          Table view — {edgeRows.length} relationships (accessible equivalent)
+        </summary>
+        <div className="max-h-96 overflow-y-auto border-t border-[var(--color-rule)]">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="sticky top-0 border-b border-[var(--color-rule)] bg-[var(--color-card)] text-left text-[0.7rem] uppercase tracking-wide text-[var(--color-muted)]">
+                <th scope="col" className="px-3 py-2 font-medium">From</th>
+                <th scope="col" className="px-3 py-2 font-medium">Relationship</th>
+                <th scope="col" className="px-3 py-2 font-medium">To</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">Weight</th>
+              </tr>
+            </thead>
+            <tbody>
+              {edgeRows.map((r, i) => (
+                <tr key={i} className="border-b border-[var(--color-rule-soft)] last:border-0">
+                  <td className="px-3 py-2">
+                    <span className="font-mono text-[0.65rem] uppercase text-[var(--color-muted)]">
+                      {NODE_LABEL[r.src!.type]}:
+                    </span>{" "}
+                    {r.src!.label}
+                  </td>
+                  <td className="px-3 py-2 font-mono text-[0.7rem] text-[var(--color-muted)]">
+                    {relPhrase(r.rel)}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className="font-mono text-[0.65rem] uppercase text-[var(--color-muted)]">
+                      {NODE_LABEL[r.dst!.type]}:
+                    </span>{" "}
+                    <span className="line-clamp-1">{r.dst!.label}</span>
+                  </td>
+                  <td className="px-3 py-2 text-right tabular">{r.weight.toFixed(0)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </div>
   );
 }

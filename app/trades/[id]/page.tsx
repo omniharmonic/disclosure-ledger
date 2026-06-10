@@ -36,6 +36,25 @@ export default async function TradeDetailPage({
     ["Sector", t.sector ?? "—"],
     ["Late notification", t.notificationLate ? "Yes — filed >30 days late" : "No"],
     ["Filing date", formatDate(t.filingDate)],
+    [
+      "Disclosure lag",
+      (() => {
+        const lag = Math.round(
+          (Date.parse(t.filingDate) - Date.parse(t.transactionDate)) / 86_400_000,
+        );
+        return lag >= 0 ? `${lag} days — not publicly knowable until filed` : "—";
+      })(),
+    ],
+    [
+      "Independent corroboration",
+      t.reconciledSources?.length ? (
+        <span key="r" className="text-[var(--color-signal)]">
+          ✓ {t.reconciledSources.join(", ")}
+        </span>
+      ) : (
+        "not yet cross-checked"
+      ),
+    ],
   ];
 
   return (

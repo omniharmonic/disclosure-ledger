@@ -15,7 +15,7 @@
 import { db } from "@/db";
 import { companies, transactions, filings, priceCache, correlations } from "@/db/schema";
 import { and, eq, inArray, isNotNull, sql, desc, lte } from "drizzle-orm";
-import { fetchJson } from "../lib/http";
+import { fetchJson, redactUrl } from "../lib/http";
 
 const ALPHA_KEY = process.env.ALPHAVANTAGE_API_KEY ?? "";
 const FINNHUB_KEY = process.env.FINNHUB_API_KEY ?? "";
@@ -119,7 +119,7 @@ export async function ingestPrices(): Promise<PricesResult> {
         result.pricePoints += rows.length;
         cached.add(ticker);
       } catch (err) {
-        result.errors.push(`${ticker}: ${String(err)}`);
+        result.errors.push(`${ticker}: ${redactUrl(String(err))}`);
       }
     }
   }
@@ -148,7 +148,7 @@ export async function ingestPrices(): Promise<PricesResult> {
             .onConflictDoNothing({ target: [priceCache.ticker, priceCache.priceDate] });
         }
       } catch (err) {
-        result.errors.push(`${ticker} quote: ${String(err)}`);
+        result.errors.push(`${ticker} quote: ${redactUrl(String(err))}`);
       }
     }
   }

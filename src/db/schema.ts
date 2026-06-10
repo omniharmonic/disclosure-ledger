@@ -21,6 +21,7 @@ import {
   bigserial,
   index,
   uniqueIndex,
+  unique,
 } from "drizzle-orm/pg-core";
 
 /** People / filers — extensible beyond the President. */
@@ -28,6 +29,11 @@ export const persons = pgTable("persons", {
   id: uuid("id").primaryKey().defaultRandom(),
   fullName: text("full_name").notNull(),
   role: text("role").notNull(), // 'President', 'Cabinet', ...
+  /**
+   * Policy power over traded companies, 0..1 — the `authority` scoring
+   * component (President 1.0; future Cabinet/Congress filers lower).
+   */
+  authority: real("authority").default(1).notNull(),
   termStart: date("term_start"),
   termEnd: date("term_end"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -41,8 +47,8 @@ export const companies = pgTable(
     name: text("name").notNull(),
     ticker: text("ticker"),
     cik: text("cik"), // SEC EDGAR CIK
-    figi: text("figi"),
-    parentId: uuid("parent_id"),
+    figi: text("figi"), // deferred: populated when the OpenFIGI fallback lands
+    parentId: uuid("parent_id"), // deferred: subsidiary→parent rollups (post-v1)
     sector: text("sector"), // GICS sector
     industry: text("industry"), // SIC industry description
     aliases: text("aliases").array(), // brands, subsidiaries, products
@@ -74,14 +80,32 @@ export const filings = pgTable(
     sourceDomain: text("source_domain"),
     pdfHash: text("pdf_hash").notNull(), // SHA-256
     rawPdfPath: text("raw_pdf_path"),
+    /** Durable mirror of the raw PDF (S3-compatible object storage, W-9). */
+    archiveUrl: text("archive_url"),
     pageCount: integer("page_count"),
     transactionCount: integer("transaction_count"),
+    /**
+     * An embedded PKCS#7 signature structure was detected in the PDF
+     * (provenance signal). Distinct from signatureVerified, which stays null
+     * until full cryptographic chain verification is implemented — presence
+     * is never presented as verification.
+     */
+    signaturePresent: boolean("signature_present"),
+    /**
+     * Cryptographic verification result: true = CMS digest + signature
+     * verified against the embedded certificate (document integrity intact);
+     * false = signature present but FAILED verification; null = no signature
+     * or not evaluable. Chain-to-root validation is out of scope and the UI
+     * copy says "integrity verified", never "identity verified".
+     */
     signatureVerified: boolean("signature_verified"),
-    parseMethod: text("parse_method"), // 'consensus' | 'llm_adjudicated'
+    /** Subject CN of the embedded signing certificate, when readable. */
+    signatureSigner: text("signature_signer"),
+    parseMethod: text("parse_method"), // heuristic-ocr|heuristic-embedded|llm_adjudicated|skipped-278e
     parseConfidence: real("parse_confidence"), // 0..1
-    status: text("status").default("pending").notNull(), // pending|parsed|review|published
-    version: integer("version").default(1).notNull(),
-    supersedesId: uuid("supersedes_id"),
+    status: text("status").default("pending").notNull(), // pending|parsed|review|published|superseded
+    version: integer("version").default(1).notNull(), // corrections-as-versions (amended filings)
+    supersedesId: uuid("supersedes_id"), // the canonical filing that superseded this copy
     parsedAt: timestamp("parsed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -113,8 +137,8 @@ export const transactions = pgTable(
     amountBand: smallint("amount_band").notNull(), // 1..10
     amountMin: bigint("amount_min", { mode: "number" }).notNull(),
     amountMax: bigint("amount_max", { mode: "number" }),
-    securityType: text("security_type"), // Stock|ETF|Bond|Option
-    owner: text("owner"), // Filer|Spouse|Dependent
+    securityType: text("security_type"), // deferred: instrument classification (post-v1)
+    owner: text("owner"), // deferred: 278-T scans rarely carry a legible owner column
     priceAtTxn: real("price_at_txn"),
     priceCurrent: real("price_current"),
     priceCurrentDate: date("price_current_date"),
@@ -148,7 +172,7 @@ export const statements = pgTable(
     attributionConf: real("attribution_conf").notNull(),
     needsReview: boolean("needs_review").default(false),
     contentHash: text("content_hash"),
-    supersededBy: uuid("superseded_by"),
+    supersededBy: uuid("superseded_by"), // CPD upgrade of a faster source (FR-S6, reconciler pending)
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
@@ -235,11 +259,19 @@ export const correlations = pgTable(
     // LLM reasoning verification (production pipeline; null = unverified).
     verifiedGenuine: boolean("verified_genuine"),
     verdictReason: text("verdict_reason"),
+    // Stamped on every correlate run that re-scores this pair; rows the run
+    // did not touch are pruned. Lets re-scoring preserve verdicts (FR-O2).
+    refreshedAt: timestamp("refreshed_at", { withTimezone: true }).defaultNow().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
     index("idx_corr_txn").on(t.transactionId),
     index("idx_corr_score").on(t.signalScore),
+    // One correlation per (trade, event) pair. NULLS NOT DISTINCT so the
+    // unused statement/action column cannot create duplicate pairs (PG ≥ 15).
+    unique("uq_corr_pair")
+      .on(t.transactionId, t.eventKind, t.statementId, t.actionId)
+      .nullsNotDistinct(),
   ],
 );
 
@@ -298,6 +330,21 @@ export const apiKeys = pgTable("api_keys", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
 });
+
+/**
+ * Operational — per-subject daily API usage counters (FR-API2). Subject is a
+ * key id for authenticated calls or a hashed client IP for anonymous ones.
+ * One row per (subject, day); incremented atomically on every request.
+ */
+export const apiUsage = pgTable(
+  "api_usage",
+  {
+    subject: text("subject").notNull(),
+    day: date("day").notNull(),
+    count: integer("count").default(0).notNull(),
+  },
+  (t) => [uniqueIndex("uq_api_usage").on(t.subject, t.day)],
+);
 
 export type Person = typeof persons.$inferSelect;
 export type Company = typeof companies.$inferSelect;

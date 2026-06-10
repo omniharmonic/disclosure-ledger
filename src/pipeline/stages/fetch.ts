@@ -14,6 +14,8 @@ import { filings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { fetchBytes } from "../lib/http";
 import { ensurePresident } from "../lib/persons";
+import { verifyPdfSignature } from "../lib/pdf-signature";
+import { archivePdf } from "../lib/object-storage";
 import type { FilingCandidate } from "./discover";
 
 const PDF_DIR = join(process.cwd(), "data", "pdfs");
@@ -58,6 +60,21 @@ export async function fetchFilings(candidates: FilingCandidate[]): Promise<Fetch
       const path = join(PDF_DIR, `${hash}.pdf`);
       await writeFile(path, bytes);
 
+      // Cryptographic signature verification (FR-T3): document integrity
+      // against the embedded certificate. Never blocks ingestion — the
+      // result is provenance, surfaced on the filing page.
+      const sig = await verifyPdfSignature(bytes);
+      if (sig.present) {
+        console.log(
+          `[fetch]   signature: ${sig.verified === true ? "verified" : sig.verified === false ? "FAILED" : "present, not evaluable"}` +
+            (sig.signer ? ` (signer: ${sig.signer})` : "") +
+            (sig.note ? ` — ${sig.note}` : ""),
+        );
+      }
+
+      // Durable provenance mirror (W-9) — no-op unless PDF_ARCHIVE_* is set.
+      const archiveUrl = await archivePdf(hash, bytes);
+
       await db.insert(filings).values({
         personId,
         formType: c.formType,
@@ -67,6 +84,10 @@ export async function fetchFilings(candidates: FilingCandidate[]): Promise<Fetch
         sourceDomain: c.sourceDomain,
         pdfHash: hash,
         rawPdfPath: path,
+        archiveUrl,
+        signaturePresent: sig.present,
+        signatureVerified: sig.verified,
+        signatureSigner: sig.signer,
         status: "pending",
       });
       result.fetched++;

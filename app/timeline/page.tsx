@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import { getTimelineEvents } from "@/lib/queries";
+import { safeLoad } from "@/lib/safe-load";
 import { TimelineView } from "@/components/TimelineView";
 
 export const metadata: Metadata = { title: "Timeline" };
-export const dynamic = "force-dynamic";
+/** ISR — data changes at most once per pipeline run; revalidated on a timer
+ *  and on demand via /api/revalidate after each run (ARCHITECTURE §7.2). */
+export const revalidate = 300;
 
 export default async function TimelinePage() {
-  const events = await getTimelineEvents();
+  const events = await safeLoad("timeline", getTimelineEvents, []);
   return (
     <div className="space-y-6">
       <header className="rise max-w-2xl">

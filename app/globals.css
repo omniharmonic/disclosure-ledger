@@ -13,7 +13,9 @@
   --color-card: #fbfaf5;
   --color-ink: #16140f;
   --color-ink-soft: #463f36;
-  --color-muted: #857b6d;
+  /* WCAG 2.1 AA: 4.99:1 on paper, 5.49:1 on card (was #857b6d at 3.62:1,
+     failing AA for the body-sized text it is used on everywhere). */
+  --color-muted: #6e6557;
   --color-rule: #d3cab6;
   --color-rule-soft: #e3dccb;
   --color-accent: #9c1f1f;

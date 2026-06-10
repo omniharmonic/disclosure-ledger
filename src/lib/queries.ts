@@ -6,7 +6,7 @@
  * exposed publicly; `review` and `pending` filings are withheld until a human
  * confirms them (PRD FR-O3, NFR "Accuracy").
  */
-import { db } from "@/db";
+import { dbRo as db } from "@/db";
 import {
   filings,
   transactions,
@@ -14,6 +14,7 @@ import {
   statements,
   statementMentions,
   actions,
+  actionTargets,
   correlations,
   graphEdges,
   persons,
@@ -22,6 +23,15 @@ import {
 import { and, or, eq, gte, lte, ilike, desc, asc, sql, inArray, count } from "drizzle-orm";
 
 export const PUBLIC_FILING_STATUSES = ["parsed", "published"] as const;
+
+/**
+ * Guard for user-supplied ids. Postgres throws (→ HTTP 500) on a malformed
+ * uuid cast; validating the shape first turns garbage input into a clean 404.
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function isUuid(id: string): boolean {
+  return UUID_RE.test(id);
+}
 
 export interface TransactionFilter {
   search?: string;
@@ -51,6 +61,7 @@ export interface TransactionRow {
   filingId: string;
   filingDate: string;
   sourceUrl: string;
+  reconciledSources: string[] | null;
 }
 
 const SORT_COLUMNS = {
@@ -99,6 +110,7 @@ export async function listTransactions(
       filingId: transactions.filingId,
       filingDate: filings.filingDate,
       sourceUrl: filings.sourceUrl,
+      reconciledSources: transactions.reconciledSources,
     })
     .from(transactions)
     .innerJoin(filings, eq(transactions.filingId, filings.id))
@@ -118,8 +130,13 @@ export async function listTransactions(
   return { rows: rows as TransactionRow[], total };
 }
 
-/** A single transaction with its filing context. */
+/**
+ * A single transaction with its filing context. Only rows from publicly
+ * released filings are returned — a `review`/`pending`/`superseded` filing's
+ * rows must not be readable even by direct URL (PRD NFR "Accuracy", FR-O3).
+ */
 export async function getTransaction(id: string): Promise<TransactionRow | null> {
+  if (!isUuid(id)) return null;
   const rows = await db
     .select({
       id: transactions.id,
@@ -137,11 +154,14 @@ export async function getTransaction(id: string): Promise<TransactionRow | null>
       filingId: transactions.filingId,
       filingDate: filings.filingDate,
       sourceUrl: filings.sourceUrl,
+      reconciledSources: transactions.reconciledSources,
     })
     .from(transactions)
     .innerJoin(filings, eq(transactions.filingId, filings.id))
     .leftJoin(companies, eq(transactions.companyId, companies.id))
-    .where(eq(transactions.id, id))
+    .where(
+      and(eq(transactions.id, id), inArray(filings.status, [...PUBLIC_FILING_STATUSES])),
+    )
     .limit(1);
   return (rows[0] as TransactionRow) ?? null;
 }
@@ -155,9 +175,14 @@ export async function listFilings() {
     .orderBy(desc(filings.filingDate));
 }
 
-/** One filing plus its transactions. */
+/** One publicly-released filing plus its transactions. */
 export async function getFiling(id: string) {
-  const [filing] = await db.select().from(filings).where(eq(filings.id, id)).limit(1);
+  if (!isUuid(id)) return null;
+  const [filing] = await db
+    .select()
+    .from(filings)
+    .where(and(eq(filings.id, id), inArray(filings.status, [...PUBLIC_FILING_STATUSES])))
+    .limit(1);
   if (!filing) return null;
   const txns = await db
     .select()
@@ -262,6 +287,7 @@ export async function getCompany(ticker: string) {
       filingId: transactions.filingId,
       filingDate: filings.filingDate,
       sourceUrl: filings.sourceUrl,
+      reconciledSources: transactions.reconciledSources,
     })
     .from(transactions)
     .innerJoin(filings, eq(transactions.filingId, filings.id))
@@ -295,14 +321,17 @@ export async function getCompany(ticker: string) {
       actionTitle: actions.title,
       actionDate: actions.occurredOn,
       actionUrl: actions.sourceUrl,
+      actionType: actions.actionType,
     })
     .from(correlations)
     .innerJoin(transactions, eq(correlations.transactionId, transactions.id))
+    .innerJoin(filings, eq(transactions.filingId, filings.id))
     .leftJoin(statements, eq(correlations.statementId, statements.id))
     .leftJoin(actions, eq(correlations.actionId, actions.id))
     .where(
       and(
         eq(transactions.companyId, company.id),
+        inArray(filings.status, [...PUBLIC_FILING_STATUSES]),
         sql`${correlations.verifiedGenuine} is not false`,
       ),
     )
@@ -316,6 +345,7 @@ export async function getCompany(ticker: string) {
       id: r.id,
       transactionId: r.transactionId,
       eventKind: r.eventKind as "statement" | "action",
+      actionType: r.actionType ?? null,
       daysGap: r.daysGap,
       signalScore: r.signalScore,
       components: (r.components ?? {}) as Record<string, number>,
@@ -334,6 +364,8 @@ export async function getCompany(ticker: string) {
 export interface CorrelationView {
   id: string;
   eventKind: "statement" | "action";
+  /** The action's type — distinguishes official acts from administration communications. */
+  actionType: string | null;
   daysGap: number;
   signalScore: number;
   components: Record<string, number>;
@@ -342,8 +374,9 @@ export interface CorrelationView {
   eventUrl: string;
 }
 
-/** Correlations for one transaction, highest signal first. */
+/** Correlations for one transaction in a public filing, highest signal first. */
 export async function getCorrelations(transactionId: string): Promise<CorrelationView[]> {
+  if (!isUuid(transactionId)) return [];
   const rows = await db
     .select({
       id: correlations.id,
@@ -357,13 +390,17 @@ export async function getCorrelations(transactionId: string): Promise<Correlatio
       actionTitle: actions.title,
       actionDate: actions.occurredOn,
       actionUrl: actions.sourceUrl,
+      actionType: actions.actionType,
     })
     .from(correlations)
+    .innerJoin(transactions, eq(correlations.transactionId, transactions.id))
+    .innerJoin(filings, eq(transactions.filingId, filings.id))
     .leftJoin(statements, eq(correlations.statementId, statements.id))
     .leftJoin(actions, eq(correlations.actionId, actions.id))
     .where(
       and(
         eq(correlations.transactionId, transactionId),
+        inArray(filings.status, [...PUBLIC_FILING_STATUSES]),
         // hide correlations the reasoning stage flagged as string coincidences
         sql`${correlations.verifiedGenuine} is not false`,
       ),
@@ -373,6 +410,7 @@ export async function getCorrelations(transactionId: string): Promise<Correlatio
   return rows.map((r) => ({
     id: r.id,
     eventKind: r.eventKind as "statement" | "action",
+    actionType: r.actionType ?? null,
     daysGap: r.daysGap,
     signalScore: r.signalScore,
     components: (r.components ?? {}) as Record<string, number>,
@@ -405,6 +443,69 @@ export interface GraphLink {
 /** The full knowledge graph as nodes + links for force-directed rendering. */
 export async function getGraph(): Promise<{ nodes: GraphNode[]; links: GraphLink[] }> {
   const edges = await db.select().from(graphEdges);
+  return assembleGraph(edges);
+}
+
+/**
+ * Bounded neighborhood expansion (FR-W7 lazy expansion / W-7): breadth-first
+ * walk of `graph_edges` from a root node, depth ≤ 3, with hard node/edge caps
+ * so a request can never pull the whole graph through this path.
+ */
+export async function getGraphNeighborhood(
+  rootType: string,
+  rootId: string,
+  depth: number,
+): Promise<{ nodes: GraphNode[]; links: GraphLink[] }> {
+  if (!isUuid(rootId)) return { nodes: [], links: [] };
+  const MAX_DEPTH = 3;
+  const MAX_EDGES = 1_500;
+  const d = Math.min(MAX_DEPTH, Math.max(1, depth));
+
+  const visited = new Set<string>([`${rootType}:${rootId}`]);
+  let frontier: { type: string; id: string }[] = [{ type: rootType, id: rootId }];
+  const collected: (typeof graphEdges.$inferSelect)[] = [];
+  const seenEdge = new Set<number>();
+
+  for (let level = 0; level < d && frontier.length > 0; level++) {
+    const next: { type: string; id: string }[] = [];
+    // Chunk the frontier to keep each OR-condition list bounded.
+    for (let i = 0; i < frontier.length; i += 100) {
+      const chunk = frontier.slice(i, i + 100);
+      const cond = or(
+        ...chunk.flatMap((f) => [
+          and(eq(graphEdges.srcType, f.type), eq(graphEdges.srcId, f.id)),
+          and(eq(graphEdges.dstType, f.type), eq(graphEdges.dstId, f.id)),
+        ]),
+      );
+      const found = await db.select().from(graphEdges).where(cond).limit(MAX_EDGES);
+      for (const e of found) {
+        if (seenEdge.has(e.id)) continue;
+        seenEdge.add(e.id);
+        collected.push(e);
+        for (const [t, id] of [
+          [e.srcType, e.srcId],
+          [e.dstType, e.dstId],
+        ] as const) {
+          const k = `${t}:${id}`;
+          if (!visited.has(k)) {
+            visited.add(k);
+            next.push({ type: t, id });
+          }
+        }
+        if (collected.length >= MAX_EDGES) break;
+      }
+      if (collected.length >= MAX_EDGES) break;
+    }
+    if (collected.length >= MAX_EDGES) break;
+    frontier = next;
+  }
+  return assembleGraph(collected);
+}
+
+/** Resolve labels/details for a set of edges and shape them for the client. */
+async function assembleGraph(
+  edges: (typeof graphEdges.$inferSelect)[],
+): Promise<{ nodes: GraphNode[]; links: GraphLink[] }> {
   const ids: Record<string, Set<string>> = {};
   for (const e of edges) {
     (ids[e.srcType] ??= new Set()).add(e.srcId);
@@ -415,37 +516,56 @@ export async function getGraph(): Promise<{ nodes: GraphNode[]; links: GraphLink
   const subs = new Map<string, string>();
   const key = (t: string, id: string) => `${t}:${id}`;
 
+  // Load label data only for ids that actually appear in the graph — never
+  // the full tables (the statement corpus alone can be tens of thousands of
+  // rows the graph does not reference).
+  const chunks = (set: Set<string>, n = 500) => {
+    const all = [...set];
+    const out: string[][] = [];
+    for (let i = 0; i < all.length; i += n) out.push(all.slice(i, i + n));
+    return out;
+  };
   if (ids.person?.size) {
-    for (const p of await db.select().from(persons)) {
-      labels.set(key("person", p.id), p.fullName);
-      subs.set(key("person", p.id), p.role);
+    for (const chunk of chunks(ids.person)) {
+      for (const p of await db.select().from(persons).where(inArray(persons.id, chunk))) {
+        labels.set(key("person", p.id), p.fullName);
+        subs.set(key("person", p.id), p.role);
+      }
     }
   }
   if (ids.company?.size) {
-    for (const c of await db.select().from(companies)) {
-      labels.set(key("company", c.id), c.ticker ?? c.name);
-      details.set(key("company", c.id), c.oneLiner ?? c.name);
-      subs.set(key("company", c.id), [c.sector, c.industry].filter(Boolean).join(" · "));
+    for (const chunk of chunks(ids.company)) {
+      for (const c of await db.select().from(companies).where(inArray(companies.id, chunk))) {
+        labels.set(key("company", c.id), c.ticker ?? c.name);
+        details.set(key("company", c.id), c.oneLiner ?? c.name);
+        subs.set(key("company", c.id), [c.sector, c.industry].filter(Boolean).join(" · "));
+      }
     }
   }
   if (ids.filing?.size) {
-    for (const f of await db.select().from(filings)) {
-      labels.set(key("filing", f.id), `${f.formType} ${f.filingDate}`);
-      subs.set(key("filing", f.id), `filed ${f.filingDate}`);
+    for (const chunk of chunks(ids.filing)) {
+      for (const f of await db.select().from(filings).where(inArray(filings.id, chunk))) {
+        labels.set(key("filing", f.id), `${f.formType} ${f.filingDate}`);
+        subs.set(key("filing", f.id), `filed ${f.filingDate}`);
+      }
     }
   }
   if (ids.statement?.size) {
-    for (const s of await db.select().from(statements)) {
-      labels.set(key("statement", s.id), s.fullText.slice(0, 44));
-      details.set(key("statement", s.id), s.fullText.slice(0, 360));
-      subs.set(key("statement", s.id), `${s.channel ?? "statement"} · ${s.spokenAt}`);
+    for (const chunk of chunks(ids.statement)) {
+      for (const s of await db.select().from(statements).where(inArray(statements.id, chunk))) {
+        labels.set(key("statement", s.id), s.fullText.slice(0, 44));
+        details.set(key("statement", s.id), s.fullText.slice(0, 360));
+        subs.set(key("statement", s.id), `${s.channel ?? "statement"} · ${s.spokenAt}`);
+      }
     }
   }
   if (ids.action?.size) {
-    for (const a of await db.select().from(actions)) {
-      labels.set(key("action", a.id), a.title.slice(0, 52));
-      details.set(key("action", a.id), a.title);
-      subs.set(key("action", a.id), `${a.actionType.replace(/_/g, " ")} · ${a.occurredOn}`);
+    for (const chunk of chunks(ids.action)) {
+      for (const a of await db.select().from(actions).where(inArray(actions.id, chunk))) {
+        labels.set(key("action", a.id), a.title.slice(0, 52));
+        details.set(key("action", a.id), a.title);
+        subs.set(key("action", a.id), `${a.actionType.replace(/_/g, " ")} · ${a.occurredOn}`);
+      }
     }
   }
 
@@ -511,8 +631,10 @@ export async function getTimelineEvents(limit = 600): Promise<TimelineEvent[]> {
     .orderBy(desc(transactions.transactionDate))
     .limit(limit);
 
+  // DISTINCT tuple + date ordering: which statements appear is deterministic
+  // (the most recent mentioned ones), not an arbitrary id-ordered subset.
   const stmts = await db
-    .selectDistinctOn([statements.id], {
+    .selectDistinct({
       id: statements.id,
       date: statements.spokenAt,
       text: statements.fullText,
@@ -520,7 +642,9 @@ export async function getTimelineEvents(limit = 600): Promise<TimelineEvent[]> {
     })
     .from(statementMentions)
     .innerJoin(statements, eq(statementMentions.statementId, statements.id))
-    .orderBy(statements.id, desc(statements.spokenAt))
+    // a record upgraded to the official CPD text is shown via its replacement
+    .where(sql`${statements.supersededBy} is null`)
+    .orderBy(desc(statements.spokenAt), statements.id)
     .limit(limit);
 
   const acts = await db
@@ -545,10 +669,16 @@ export async function getTimelineEvents(limit = 600): Promise<TimelineEvent[]> {
     })
     .from(correlations)
     .innerJoin(transactions, eq(correlations.transactionId, transactions.id))
+    .innerJoin(filings, eq(transactions.filingId, filings.id))
     .leftJoin(companies, eq(transactions.companyId, companies.id))
     .leftJoin(statements, eq(correlations.statementId, statements.id))
     .leftJoin(actions, eq(correlations.actionId, actions.id))
-    .where(sql`${correlations.verifiedGenuine} is not false`);
+    .where(
+      and(
+        inArray(filings.status, [...PUBLIC_FILING_STATUSES]),
+        sql`${correlations.verifiedGenuine} is not false`,
+      ),
+    );
 
   type Rel = { label: string; signal: number; href: string };
   const byTrade = new Map<string, Rel[]>();
@@ -619,6 +749,327 @@ export async function getTimelineEvents(limit = 600): Promise<TimelineEvent[]> {
       related: topRel(byEvent.get(a.id)),
     })),
   ];
+}
+
+// ---------------------------------------------------------------------------
+// Public API list queries (FR-API1) — same gating rules as the site.
+// ---------------------------------------------------------------------------
+
+export interface StatementFilter {
+  dateFrom?: string;
+  dateTo?: string;
+  channel?: string;
+  ticker?: string;
+  page?: number;
+  limit?: number;
+}
+
+/** Public statements, newest first; optionally only those mentioning a ticker. */
+export async function listStatements(filter: StatementFilter = {}) {
+  const page = Math.max(1, filter.page ?? 1);
+  const limit = Math.min(200, Math.max(1, filter.limit ?? 50));
+
+  const conds = [];
+  if (filter.dateFrom) conds.push(gte(statements.spokenAt, filter.dateFrom));
+  if (filter.dateTo) conds.push(lte(statements.spokenAt, filter.dateTo));
+  if (filter.channel) conds.push(eq(statements.channel, filter.channel));
+
+  const base = db
+    .selectDistinctOn([statements.spokenAt, statements.id], {
+      id: statements.id,
+      spokenAt: statements.spokenAt,
+      channel: statements.channel,
+      venue: statements.venue,
+      fullText: statements.fullText,
+      source: statements.source,
+      sourceUrl: statements.sourceUrl,
+      attributionMethod: statements.attributionMethod,
+      attributionConf: statements.attributionConf,
+      needsReview: statements.needsReview,
+      supersededBy: statements.supersededBy,
+    })
+    .from(statements);
+
+  if (filter.ticker) {
+    const rows = await base
+      .innerJoin(statementMentions, eq(statementMentions.statementId, statements.id))
+      .innerJoin(companies, eq(statementMentions.companyId, companies.id))
+      .where(and(...conds, eq(companies.ticker, filter.ticker)))
+      .orderBy(desc(statements.spokenAt), statements.id)
+      .limit(limit)
+      .offset((page - 1) * limit);
+    const [{ value: total }] = await db
+      .select({ value: sql<number>`count(distinct ${statements.id})` })
+      .from(statements)
+      .innerJoin(statementMentions, eq(statementMentions.statementId, statements.id))
+      .innerJoin(companies, eq(statementMentions.companyId, companies.id))
+      .where(and(...conds, eq(companies.ticker, filter.ticker)));
+    return { rows, total: Number(total) };
+  }
+
+  const rows = await base
+    .where(conds.length ? and(...conds) : undefined)
+    .orderBy(desc(statements.spokenAt), statements.id)
+    .limit(limit)
+    .offset((page - 1) * limit);
+  const [{ value: total }] = await db
+    .select({ value: count() })
+    .from(statements)
+    .where(conds.length ? and(...conds) : undefined);
+  return { rows, total: Number(total) };
+}
+
+export interface ActionFilter {
+  dateFrom?: string;
+  dateTo?: string;
+  type?: string;
+  ticker?: string;
+  page?: number;
+  limit?: number;
+}
+
+/** Official actions, newest first; optionally only those affecting a ticker. */
+export async function listActions(filter: ActionFilter = {}) {
+  const page = Math.max(1, filter.page ?? 1);
+  const limit = Math.min(200, Math.max(1, filter.limit ?? 50));
+
+  const conds = [];
+  if (filter.dateFrom) conds.push(gte(actions.occurredOn, filter.dateFrom));
+  if (filter.dateTo) conds.push(lte(actions.occurredOn, filter.dateTo));
+  if (filter.type) conds.push(eq(actions.actionType, filter.type));
+
+  const base = db
+    .selectDistinctOn([actions.occurredOn, actions.id], {
+      id: actions.id,
+      actionType: actions.actionType,
+      occurredOn: actions.occurredOn,
+      signedOn: actions.signedOn,
+      title: actions.title,
+      summary: actions.summary,
+      source: actions.source,
+      sourceRef: actions.sourceRef,
+      sourceUrl: actions.sourceUrl,
+    })
+    .from(actions);
+
+  if (filter.ticker) {
+    const rows = await base
+      .innerJoin(actionTargets, eq(actionTargets.actionId, actions.id))
+      .innerJoin(companies, eq(actionTargets.companyId, companies.id))
+      .where(and(...conds, eq(companies.ticker, filter.ticker)))
+      .orderBy(desc(actions.occurredOn), actions.id)
+      .limit(limit)
+      .offset((page - 1) * limit);
+    const [{ value: total }] = await db
+      .select({ value: sql<number>`count(distinct ${actions.id})` })
+      .from(actions)
+      .innerJoin(actionTargets, eq(actionTargets.actionId, actions.id))
+      .innerJoin(companies, eq(actionTargets.companyId, companies.id))
+      .where(and(...conds, eq(companies.ticker, filter.ticker)));
+    return { rows, total: Number(total) };
+  }
+
+  const rows = await base
+    .where(conds.length ? and(...conds) : undefined)
+    .orderBy(desc(actions.occurredOn), actions.id)
+    .limit(limit)
+    .offset((page - 1) * limit);
+  const [{ value: total }] = await db
+    .select({ value: count() })
+    .from(actions)
+    .where(conds.length ? and(...conds) : undefined);
+  return { rows, total: Number(total) };
+}
+
+export interface CorrelationListFilter {
+  transactionId?: string;
+  ticker?: string;
+  kind?: "statement" | "action";
+  minScore?: number;
+  page?: number;
+  limit?: number;
+}
+
+/** Public correlations with their event payloads, highest signal first. */
+export async function listCorrelations(filter: CorrelationListFilter = {}) {
+  const page = Math.max(1, filter.page ?? 1);
+  const limit = Math.min(200, Math.max(1, filter.limit ?? 50));
+
+  const conds = [
+    inArray(filings.status, [...PUBLIC_FILING_STATUSES]),
+    sql`${correlations.verifiedGenuine} is not false`,
+  ];
+  if (filter.transactionId) conds.push(eq(correlations.transactionId, filter.transactionId));
+  if (filter.ticker) conds.push(eq(companies.ticker, filter.ticker));
+  if (filter.kind) conds.push(eq(correlations.eventKind, filter.kind));
+  if (filter.minScore != null) conds.push(gte(correlations.signalScore, filter.minScore));
+
+  const select = {
+    id: correlations.id,
+    transactionId: correlations.transactionId,
+    eventKind: correlations.eventKind,
+    statementId: correlations.statementId,
+    actionId: correlations.actionId,
+    daysGap: correlations.daysGap,
+    signalScore: correlations.signalScore,
+    components: correlations.components,
+    scoringVersion: correlations.scoringVersion,
+    transactionDate: transactions.transactionDate,
+    transactionType: transactions.transactionType,
+    ticker: companies.ticker,
+    statementText: statements.fullText,
+    statementDate: statements.spokenAt,
+    statementUrl: statements.sourceUrl,
+    actionTitle: actions.title,
+    actionDate: actions.occurredOn,
+    actionUrl: actions.sourceUrl,
+  };
+
+  const rows = await db
+    .select(select)
+    .from(correlations)
+    .innerJoin(transactions, eq(correlations.transactionId, transactions.id))
+    .innerJoin(filings, eq(transactions.filingId, filings.id))
+    .leftJoin(companies, eq(transactions.companyId, companies.id))
+    .leftJoin(statements, eq(correlations.statementId, statements.id))
+    .leftJoin(actions, eq(correlations.actionId, actions.id))
+    .where(and(...conds))
+    .orderBy(desc(correlations.signalScore))
+    .limit(limit)
+    .offset((page - 1) * limit);
+
+  const [{ value: total }] = await db
+    .select({ value: count() })
+    .from(correlations)
+    .innerJoin(transactions, eq(correlations.transactionId, transactions.id))
+    .innerJoin(filings, eq(transactions.filingId, filings.id))
+    .leftJoin(companies, eq(transactions.companyId, companies.id))
+    .where(and(...conds));
+
+  return { rows, total: Number(total) };
+}
+
+/**
+ * Iterate every public transaction in stable order — the bulk-export feed
+ * (FR-API5). Yields pages so the export route can stream without holding the
+ * full dataset in memory.
+ */
+export async function* iterateAllTransactions(pageSize = 1000) {
+  let page = 1;
+  for (;;) {
+    const { rows } = await listTransactions({
+      page,
+      limit: Math.min(200, pageSize),
+      sortBy: "date",
+      order: "asc",
+    });
+    if (rows.length === 0) return;
+    yield rows;
+    if (rows.length < Math.min(200, pageSize)) return;
+    page++;
+  }
+}
+
+export interface HoldingAggregate {
+  ticker: string | null;
+  name: string;
+  tradeCount: number;
+  sumMin: number;
+  sumMax: number;
+}
+
+/** Largest disclosed positions by summed statutory band range (FR-W1). */
+export async function getTopHoldings(limitN = 5): Promise<HoldingAggregate[]> {
+  const rows = await db
+    .select({
+      ticker: companies.ticker,
+      name: companies.name,
+      tradeCount: count(transactions.id),
+      sumMin: sql<number>`coalesce(sum(${transactions.amountMin}), 0)`,
+      sumMax: sql<number>`coalesce(sum(coalesce(${transactions.amountMax}, ${transactions.amountMin})), 0)`,
+    })
+    .from(transactions)
+    .innerJoin(filings, eq(transactions.filingId, filings.id))
+    .innerJoin(companies, eq(transactions.companyId, companies.id))
+    .where(inArray(filings.status, [...PUBLIC_FILING_STATUSES]))
+    .groupBy(companies.id)
+    .orderBy(desc(sql`sum(coalesce(${transactions.amountMax}, ${transactions.amountMin}))`))
+    .limit(limitN);
+  return rows.map((r) => ({
+    ...r,
+    tradeCount: Number(r.tradeCount),
+    sumMin: Number(r.sumMin),
+    sumMax: Number(r.sumMax),
+  }));
+}
+
+export interface SectorAggregate {
+  sector: string;
+  tradeCount: number;
+  sumMin: number;
+  sumMax: number;
+}
+
+/** Disclosed-trade concentration by sector (FR-W1, UC4). */
+export async function getSectorBreakdown(): Promise<SectorAggregate[]> {
+  const rows = await db
+    .select({
+      sector: sql<string>`coalesce(${companies.sector}, 'Unresolved / non-equity')`,
+      tradeCount: count(transactions.id),
+      sumMin: sql<number>`coalesce(sum(${transactions.amountMin}), 0)`,
+      sumMax: sql<number>`coalesce(sum(coalesce(${transactions.amountMax}, ${transactions.amountMin})), 0)`,
+    })
+    .from(transactions)
+    .innerJoin(filings, eq(transactions.filingId, filings.id))
+    .leftJoin(companies, eq(transactions.companyId, companies.id))
+    .where(inArray(filings.status, [...PUBLIC_FILING_STATUSES]))
+    .groupBy(sql`coalesce(${companies.sector}, 'Unresolved / non-equity')`)
+    .orderBy(desc(sql`sum(coalesce(${transactions.amountMax}, ${transactions.amountMin}))`));
+  return rows.map((r) => ({
+    ...r,
+    tradeCount: Number(r.tradeCount),
+    sumMin: Number(r.sumMin),
+    sumMax: Number(r.sumMax),
+  }));
+}
+
+export interface GainLossLeader {
+  id: string;
+  ticker: string;
+  transactionType: string;
+  transactionDate: string;
+  gainLossPct: number;
+}
+
+/** Best/worst price moves since the trade (FR-W1 gain/loss leaders). */
+export async function getGainLossLeaders(perSide = 3): Promise<{
+  gainers: GainLossLeader[];
+  losers: GainLossLeader[];
+}> {
+  const base = () =>
+    db
+      .select({
+        id: transactions.id,
+        ticker: sql<string>`${companies.ticker}`,
+        transactionType: transactions.transactionType,
+        transactionDate: transactions.transactionDate,
+        gainLossPct: sql<number>`${transactions.gainLossPct}`,
+      })
+      .from(transactions)
+      .innerJoin(filings, eq(transactions.filingId, filings.id))
+      .innerJoin(companies, eq(transactions.companyId, companies.id))
+      .where(
+        and(
+          inArray(filings.status, [...PUBLIC_FILING_STATUSES]),
+          sql`${transactions.gainLossPct} is not null`,
+        ),
+      );
+  const gainers = await base().orderBy(desc(transactions.gainLossPct)).limit(perSide);
+  const losers = await base().orderBy(asc(transactions.gainLossPct)).limit(perSide);
+  return {
+    gainers: gainers.filter((g) => g.gainLossPct > 0),
+    losers: losers.filter((l) => l.gainLossPct < 0),
+  };
 }
 
 /** Headline statistics for the dashboard. */

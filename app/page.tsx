@@ -1,8 +1,19 @@
 import Link from "next/link";
-import { getStats, getTypeBreakdown, listTransactions, listCompanies } from "@/lib/queries";
+import {
+  getStats,
+  getTypeBreakdown,
+  listTransactions,
+  listCompanies,
+  getTopHoldings,
+  getSectorBreakdown,
+  getGainLossLeaders,
+} from "@/lib/queries";
 import { formatDate, formatDollars, formatAmount, typeColor } from "@/lib/format";
+import { safeLoad } from "@/lib/safe-load";
 
-export const dynamic = "force-dynamic";
+/** ISR — data changes at most once per pipeline run; revalidated on a timer
+ *  and on demand via /api/revalidate after each run (ARCHITECTURE §7.2). */
+export const revalidate = 300;
 
 function StatCard({ label, value, sub, i }: { label: string; value: string; sub?: string; i: number }) {
   return (
@@ -20,14 +31,35 @@ function StatCard({ label, value, sub, i }: { label: string; value: string; sub?
 }
 
 export default async function HomePage() {
-  const [stats, types, recent, companies] = await Promise.all([
-    getStats(),
-    getTypeBreakdown(),
-    listTransactions({ limit: 10, sortBy: "date", order: "desc" }),
-    listCompanies(),
-  ]);
+  const [stats, types, recent, companies, holdings, sectors, gainLoss] = await safeLoad(
+    "dashboard",
+    () =>
+      Promise.all([
+        getStats(),
+        getTypeBreakdown(),
+        listTransactions({ limit: 10, sortBy: "date", order: "desc" }),
+        listCompanies(),
+        getTopHoldings(5),
+        getSectorBreakdown(),
+        getGainLossLeaders(3),
+      ]),
+    [
+      {
+        totalTransactions: 0, totalFilings: 0, earliestDate: null, latestDate: null,
+        lastFilingDate: null, estimatedValueMin: 0, estimatedValueMax: 0,
+      },
+      [],
+      { rows: [], total: 0 },
+      [],
+      [],
+      [],
+      { gainers: [], losers: [] },
+    ],
+  );
   const hasData = stats.totalTransactions > 0;
   const topCompanies = companies.filter((c) => c.correlationCount > 0).slice(0, 5);
+  const sectorMax = Math.max(1, ...sectors.map((s) => s.sumMax));
+  const leaders = [...gainLoss.gainers, ...gainLoss.losers];
 
   return (
     <div className="space-y-14">
@@ -57,7 +89,7 @@ export default async function HomePage() {
           <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <StatCard i={0} label="Transactions" value={stats.totalTransactions.toLocaleString()} sub="from released filings" />
             <StatCard i={1} label="Estimated value" value={`${formatDollars(stats.estimatedValueMin)}–${formatDollars(stats.estimatedValueMax)}`} sub="sum of statutory bands" />
-            <StatCard i={2} label="Date coverage" value={stats.earliestDate ? `${new Date(stats.earliestDate).getFullYear()}–${new Date(stats.latestDate!).getFullYear()}` : "—"} sub={stats.earliestDate ? `${formatDate(stats.earliestDate)} – ${formatDate(stats.latestDate)}` : undefined} />
+            <StatCard i={2} label="Date coverage" value={stats.earliestDate ? `${stats.earliestDate.slice(0, 4)}–${stats.latestDate!.slice(0, 4)}` : "—"} sub={stats.earliestDate ? `${formatDate(stats.earliestDate)} – ${formatDate(stats.latestDate)}` : undefined} />
             <StatCard i={3} label="Filings" value={String(stats.totalFilings)} sub={stats.lastFilingDate ? `last ${formatDate(stats.lastFilingDate)}` : undefined} />
           </section>
 
@@ -90,6 +122,98 @@ export default async function HomePage() {
               </div>
             </section>
           )}
+
+          <section className="grid gap-8 lg:grid-cols-3">
+            <div>
+              <div className="kicker">Top disclosed positions</div>
+              <p className="mt-1 text-[0.7rem] text-[var(--color-muted)]">
+                Summed statutory ranges — bounds, never exact figures.
+              </p>
+              <ul className="mt-3 space-y-2">
+                {holdings.map((h) => (
+                  <li key={h.ticker ?? h.name}>
+                    <Link
+                      href={`/companies/${encodeURIComponent(h.ticker ?? h.name)}`}
+                      className="flex items-baseline justify-between gap-3 rounded border border-[var(--color-rule)] bg-[var(--color-card)] px-3 py-2 hover:border-[var(--color-accent)]"
+                    >
+                      <span>
+                        <span className="font-mono font-bold">{h.ticker ?? "—"}</span>{" "}
+                        <span className="text-xs text-[var(--color-muted)]">
+                          {h.tradeCount} trade{h.tradeCount === 1 ? "" : "s"}
+                        </span>
+                      </span>
+                      <span className="tabular text-sm whitespace-nowrap">
+                        {formatDollars(h.sumMin)}–{formatDollars(h.sumMax)}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <div className="kicker">Sector concentration</div>
+              <p className="mt-1 text-[0.7rem] text-[var(--color-muted)]">
+                Upper-bound of summed ranges per sector.
+              </p>
+              <div className="mt-3 space-y-2">
+                {sectors.slice(0, 7).map((s) => (
+                  <div key={s.sector}>
+                    <div className="flex justify-between text-xs">
+                      <span className="truncate pr-2">{s.sector}</span>
+                      <span className="tabular whitespace-nowrap text-[var(--color-muted)]">
+                        {formatDollars(s.sumMin)}–{formatDollars(s.sumMax)}
+                      </span>
+                    </div>
+                    <div className="mt-1 h-1.5 rounded-full bg-[var(--color-rule-soft)]">
+                      <div
+                        className="h-1.5 rounded-full bg-[var(--color-accent)]/70"
+                        style={{ width: `${Math.max(2, (s.sumMax / sectorMax) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="kicker">Price moves since trade</div>
+              <p className="mt-1 text-[0.7rem] text-[var(--color-muted)]">
+                EOD change since transaction date — indicative, not a realized return.
+              </p>
+              {leaders.length === 0 ? (
+                <p className="mt-3 rounded border border-dashed border-[var(--color-rule)] p-4 text-xs text-[var(--color-muted)]">
+                  Price enrichment pending — appears once the price pipeline has run.
+                </p>
+              ) : (
+                <ul className="mt-3 space-y-2">
+                  {leaders.map((g) => (
+                    <li key={g.id}>
+                      <Link
+                        href={`/trades/${g.id}`}
+                        className="flex items-baseline justify-between gap-3 rounded border border-[var(--color-rule)] bg-[var(--color-card)] px-3 py-2 hover:border-[var(--color-accent)]"
+                      >
+                        <span>
+                          <span className="font-mono font-bold">{g.ticker}</span>{" "}
+                          <span className={`text-xs ${typeColor(g.transactionType)}`}>
+                            {g.transactionType}
+                          </span>{" "}
+                          <span className="text-xs text-[var(--color-muted)]">
+                            {formatDate(g.transactionDate)}
+                          </span>
+                        </span>
+                        <span
+                          className="tabular text-sm font-semibold"
+                          style={{ color: g.gainLossPct >= 0 ? "var(--color-buy)" : "var(--color-sell)" }}
+                        >
+                          {g.gainLossPct >= 0 ? "+" : ""}
+                          {g.gainLossPct.toFixed(1)}%
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
 
           <section className="grid gap-8 lg:grid-cols-[2fr_1fr]">
             <div>

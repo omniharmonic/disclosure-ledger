@@ -38,6 +38,16 @@ export default async function FilingDetailPage({
           ["Parse confidence", filing.parseConfidence != null
             ? `${(filing.parseConfidence * 100).toFixed(0)}%`
             : "—"],
+          [
+            "Digital signature",
+            filing.signatureVerified === true
+              ? `✓ integrity verified${filing.signatureSigner ? ` — signed by ${filing.signatureSigner}` : ""}`
+              : filing.signatureVerified === false
+                ? "✗ verification FAILED — bytes differ from what was signed"
+                : filing.signaturePresent
+                  ? "present — not yet cryptographically evaluated"
+                  : "none detected",
+          ],
         ].map(([k, v]) => (
           <div key={k}>
             <dt className="text-xs uppercase tracking-wide text-[var(--color-muted)]">{k}</dt>
@@ -45,15 +55,34 @@ export default async function FilingDetailPage({
           </div>
         ))}
       </dl>
+      {filing.signatureVerified === true && (
+        <p className="font-mono text-[0.7rem] text-[var(--color-muted)]">
+          &ldquo;Integrity verified&rdquo; means the PDF&rsquo;s signed bytes are unchanged
+          since the embedded certificate signed them. Certificate chain-of-trust validation
+          to a root authority is not performed.
+        </p>
+      )}
 
-      <a
-        href={filing.sourceUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-block rounded border border-[var(--color-rule)] bg-white px-4 py-2 text-sm hover:bg-[var(--color-paper)]"
-      >
-        View original source PDF ↗
-      </a>
+      <div className="flex flex-wrap gap-3">
+        <a
+          href={filing.sourceUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block rounded border border-[var(--color-rule)] bg-white px-4 py-2 text-sm hover:bg-[var(--color-paper)]"
+        >
+          View original source PDF ↗
+        </a>
+        {filing.archiveUrl && (
+          <a
+            href={filing.archiveUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block rounded border border-[var(--color-rule)] bg-white px-4 py-2 text-sm hover:bg-[var(--color-paper)]"
+          >
+            Mirrored copy (durable archive) ↗
+          </a>
+        )}
+      </div>
 
       {txns.length > 0 && (
         <div className="overflow-x-auto rounded border border-[var(--color-rule)]">
