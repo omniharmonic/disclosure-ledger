@@ -29,6 +29,11 @@ export const persons = pgTable("persons", {
   id: uuid("id").primaryKey().defaultRandom(),
   fullName: text("full_name").notNull(),
   role: text("role").notNull(), // 'President', 'Cabinet', ...
+  /**
+   * Policy power over traded companies, 0..1 — the `authority` scoring
+   * component (President 1.0; future Cabinet/Congress filers lower).
+   */
+  authority: real("authority").default(1).notNull(),
   termStart: date("term_start"),
   termEnd: date("term_end"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

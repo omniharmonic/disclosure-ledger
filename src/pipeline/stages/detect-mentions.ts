@@ -13,6 +13,7 @@
 import { db } from "@/db";
 import { companies, statements, statementMentions, actions, actionTargets } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
+import { SECTOR_TOPICS } from "../lib/topics";
 
 /**
  * Generic words that recur in company names but carry no identifying weight —
@@ -43,7 +44,7 @@ const TICKER_STOPWORDS = new Set([
   "AN", "AM", "PM", "US", "UK", "EU", "DOW", "FOX", "ICE", "JOB", "LOVE", "PAY", "TV",
 ]);
 
-interface Gaz {
+export interface Gaz {
   companyId: string;
   ticker: string | null;
   /**
@@ -101,7 +102,7 @@ const WEAK_SOLO_TOKENS = new Set([
  * token) is matched alone; two or more remaining words must match as an
  * adjacent phrase.
  */
-function companyMatchKey(name: string): string | null {
+export function companyMatchKey(name: string): string | null {
   const words = name
     .toLowerCase()
     .replace(/[^a-z0-9 ]/g, " ")
@@ -127,7 +128,7 @@ async function buildGazetteer(): Promise<Gaz[]> {
 }
 
 /** Find verified mention spans of a company within `text`. */
-function findSpans(text: string, g: Gaz): { quote: string; start: number; end: number }[] {
+export function findSpans(text: string, g: Gaz): { quote: string; start: number; end: number }[] {
   const hits: { quote: string; start: number; end: number }[] = [];
   const patterns: RegExp[] = [];
   // Tickers are matched ONLY as cashtags ("$AAPL"). Bare ticker symbols are
@@ -155,6 +156,28 @@ function findSpans(text: string, g: Gaz): { quote: string; start: number; end: n
         hits.push({ quote, start, end });
       }
     }
+  }
+  return hits;
+}
+
+/**
+ * Find sub-industry topic spans ("semiconductors", "drug prices") in `text`.
+ * Verified the same way as company spans (FR-S5): the matched text is sliced
+ * back out of the source before a span is accepted.
+ */
+export function findTopicSpans(
+  text: string,
+  pattern: RegExp,
+): { quote: string; start: number; end: number }[] {
+  const hits: { quote: string; start: number; end: number }[] = [];
+  const re = new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : pattern.flags + "g");
+  for (const m of text.matchAll(re)) {
+    const start = m.index ?? 0;
+    const end = start + m[0].length;
+    if (text.slice(start, end) !== m[0]) continue;
+    const qStart = Math.max(0, start - 80);
+    const qEnd = Math.min(text.length, end + 80);
+    hits.push({ quote: text.slice(qStart, qEnd).trim(), start, end });
   }
   return hits;
 }
@@ -197,6 +220,24 @@ export async function detectMentions(): Promise<MentionResult> {
         result.statementMentions++;
       }
     }
+    // Sub-industry topic pass — sector-level signal ("he praised
+    // semiconductors days before a chip trade"), PRD FR-C1's sector tier.
+    for (const tp of SECTOR_TOPICS) {
+      const spans = findTopicSpans(s.text, tp.statementPattern);
+      if (spans.length === 0) continue;
+      const span = spans[0]; // one topic mention per statement is enough
+      await db.insert(statementMentions).values({
+        statementId: s.id,
+        companyId: null,
+        sector: tp.topic,
+        exactQuote: span.quote,
+        charStart: span.start,
+        charEnd: span.end,
+        confidence: 0.5,
+        method: "gazetteer",
+      });
+      result.statementMentions++;
+    }
   }
 
   // --- official actions ----------------------------------------------------
@@ -219,6 +260,18 @@ export async function detectMentions(): Promise<MentionResult> {
         });
         result.actionTargets++;
       }
+    }
+    // Sub-industry topic pass (sector-level action linkage, FR-A3).
+    for (const tp of SECTOR_TOPICS) {
+      if (findTopicSpans(text, tp.statementPattern).length === 0) continue;
+      await db.insert(actionTargets).values({
+        actionId: a.id,
+        companyId: null,
+        sector: tp.topic,
+        linkMethod: "sector",
+        confidence: 0.5,
+      });
+      result.actionTargets++;
     }
   }
 

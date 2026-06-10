@@ -2,10 +2,16 @@
  * Stage 7 — Correlate.
  *
  * For every trade in a resolved company, finds statements and official actions
- * about that company within an asymmetric window around the transaction date,
- * and scores each (trade ↔ event) pair with the transparent multi-component
- * model in ARCHITECTURE §6.2. Scores and their full component breakdown are
- * materialized in `correlations`.
+ * about that company — named directly, or addressing its sub-industry topic —
+ * within an asymmetric window around the transaction date, and scores each
+ * (trade ↔ event) pair with the transparent model in `src/lib/scoring.ts`.
+ * Scores and their full component breakdown are materialized in
+ * `correlations`.
+ *
+ * Re-scoring is an UPSERT keyed on the (trade, event) pair — never a
+ * truncate-and-rebuild — so `verified_genuine` / `verdict_reason` survive
+ * every run (FR-O2). Pairs the run no longer produces (window/threshold
+ * change, event removed) are pruned by their stale `refreshed_at` stamp.
  *
  * The score is an analytical index — never a verdict.
  */
@@ -13,6 +19,8 @@ import { db } from "@/db";
 import {
   transactions,
   filings,
+  companies,
+  persons,
   statements,
   statementMentions,
   actions,
@@ -20,9 +28,17 @@ import {
   correlations,
 } from "@/db/schema";
 import { and, eq, gte, lte, lt, inArray, isNotNull, sql } from "drizzle-orm";
-import { bandMidpoint } from "@/lib/bands";
+import {
+  SCORING_VERSION,
+  type ScoreComponents,
+  temporalProximity,
+  magnitudeScore,
+  corroborationScore,
+  score,
+} from "@/lib/scoring";
+import { topicsForCompany } from "../lib/topics";
 
-export const SCORING_VERSION = "1.0";
+export { SCORING_VERSION };
 
 /** Asymmetric candidate window: a trade preceding an event is the stronger signal. */
 const WINDOW_BEFORE_DAYS = 45;
@@ -32,15 +48,6 @@ const SCORE_THRESHOLD = 25;
 /** Cap per trade — keep only the highest-signal events so one heavily-named
  *  company does not bury a trade under hundreds of low-signal correlations. */
 const MAX_PER_TRADE = 25;
-
-const WEIGHTS = {
-  temporalProximity: 0.3,
-  entitySpecificity: 0.25,
-  authority: 0.1,
-  directionalConsistency: 0.15,
-  tradeMagnitude: 0.1,
-  corroboration: 0.1,
-} as const;
 
 function daysBetween(a: string, b: string): number {
   return Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
@@ -52,32 +59,12 @@ function addDays(iso: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** log-normalised band midpoint in [0,1]. */
-function magnitudeScore(band: number): number {
-  const lo = Math.log(8_000);
-  const hi = Math.log(50_000_000);
-  const v = (Math.log(bandMidpoint(band)) - lo) / (hi - lo);
-  return Math.min(1, Math.max(0, v));
-}
-
-interface Components {
-  temporalProximity: number;
-  entitySpecificity: number;
-  authority: number;
-  directionalConsistency: number;
-  tradeMagnitude: number;
-  corroboration: number;
-}
-
-function score(c: Components): number {
-  const s =
-    WEIGHTS.temporalProximity * c.temporalProximity +
-    WEIGHTS.entitySpecificity * c.entitySpecificity +
-    WEIGHTS.authority * c.authority +
-    WEIGHTS.directionalConsistency * c.directionalConsistency +
-    WEIGHTS.tradeMagnitude * c.tradeMagnitude +
-    WEIGHTS.corroboration * c.corroboration;
-  return Math.round(s * 1000) / 10; // 0..100, one decimal
+interface CandidateEvent {
+  kind: "statement" | "action";
+  id: string;
+  date: string;
+  /** 1.0 direct issuer mention · 0.6 sub-industry topic match. */
+  specificity: number;
 }
 
 export interface CorrelateResult {
@@ -85,14 +72,7 @@ export interface CorrelateResult {
   trades: number;
 }
 
-/**
- * Build correlations for all resolved trades in public filings.
- *
- * Re-scoring is an UPSERT keyed on the (trade, event) pair — never a
- * truncate-and-rebuild — so `verified_genuine` / `verdict_reason` survive
- * every run (FR-O2). Pairs the run no longer produces (window/threshold
- * change, event removed) are pruned by their stale `refreshed_at` stamp.
- */
+/** Build correlations for all resolved trades in public filings. */
 export async function correlate(): Promise<CorrelateResult> {
   const runStarted = new Date();
 
@@ -102,9 +82,14 @@ export async function correlate(): Promise<CorrelateResult> {
       companyId: transactions.companyId,
       date: transactions.transactionDate,
       band: transactions.amountBand,
+      industry: companies.industry,
+      sector: companies.sector,
+      authority: persons.authority,
     })
     .from(transactions)
     .innerJoin(filings, eq(transactions.filingId, filings.id))
+    .innerJoin(companies, eq(transactions.companyId, companies.id))
+    .leftJoin(persons, eq(transactions.personId, persons.id))
     .where(
       and(isNotNull(transactions.companyId), inArray(filings.status, ["parsed", "published"])),
     );
@@ -115,13 +100,14 @@ export async function correlate(): Promise<CorrelateResult> {
     if (!t.companyId) continue;
     const from = addDays(t.date, -WINDOW_BEFORE_DAYS);
     const to = addDays(t.date, WINDOW_AFTER_DAYS);
+    const topics = topicsForCompany(t.industry, t.sector);
     let matched = false;
 
-    // Candidate statements mentioning the company in-window. DISTINCT on the
-    // statement: a statement that mentions the company several times ("Nvidia
-    // … $NVDA") is ONE event, not several — multiple spans previously created
-    // duplicate correlation rows for the same (trade, statement) pair.
-    const stmts = await db
+    // Direct candidates — events naming the company. DISTINCT per event: a
+    // statement that mentions the company several times ("Nvidia … $NVDA") is
+    // ONE event, not several — multiple spans previously created duplicate
+    // correlation rows for the same (trade, statement) pair.
+    const directStmts = await db
       .selectDistinctOn([statements.id], { id: statements.id, date: statements.spokenAt })
       .from(statementMentions)
       .innerJoin(statements, eq(statementMentions.statementId, statements.id))
@@ -134,9 +120,7 @@ export async function correlate(): Promise<CorrelateResult> {
       )
       .orderBy(statements.id);
 
-    // Candidate actions affecting the company in-window (DISTINCT for the
-    // same reason).
-    const acts = await db
+    const directActs = await db
       .selectDistinctOn([actions.id], { id: actions.id, date: actions.occurredOn })
       .from(actionTargets)
       .innerJoin(actions, eq(actionTargets.actionId, actions.id))
@@ -149,21 +133,64 @@ export async function correlate(): Promise<CorrelateResult> {
       )
       .orderBy(actions.id);
 
-    const events: { kind: "statement" | "action"; id: string; date: string }[] = [
-      ...stmts.map((s) => ({ kind: "statement" as const, id: s.id, date: s.date })),
-      ...acts.map((a) => ({ kind: "action" as const, id: a.id, date: a.date })),
-    ];
-    const corroboration = Math.min(1, Math.max(0, (events.length - 1) * 0.25));
+    // Topic candidates — events addressing the company's sub-industry
+    // ("semiconductors" for a chip maker). Specificity 0.6 (PRD §6.2 scale).
+    const topicStmts = topics.length
+      ? await db
+          .selectDistinctOn([statements.id], { id: statements.id, date: statements.spokenAt })
+          .from(statementMentions)
+          .innerJoin(statements, eq(statementMentions.statementId, statements.id))
+          .where(
+            and(
+              inArray(statementMentions.sector, topics),
+              gte(statements.spokenAt, from),
+              lte(statements.spokenAt, to),
+            ),
+          )
+          .orderBy(statements.id)
+      : [];
+
+    const topicActs = topics.length
+      ? await db
+          .selectDistinctOn([actions.id], { id: actions.id, date: actions.occurredOn })
+          .from(actionTargets)
+          .innerJoin(actions, eq(actionTargets.actionId, actions.id))
+          .where(
+            and(
+              inArray(actionTargets.sector, topics),
+              gte(actions.occurredOn, from),
+              lte(actions.occurredOn, to),
+            ),
+          )
+          .orderBy(actions.id)
+      : [];
+
+    // Merge, direct-first: an event that both names the company and mentions
+    // the topic scores as a direct mention.
+    const byKey = new Map<string, CandidateEvent>();
+    const add = (kind: "statement" | "action", id: string, date: string, spec: number) => {
+      const k = `${kind}:${id}`;
+      const existing = byKey.get(k);
+      if (!existing || spec > existing.specificity) byKey.set(k, { kind, id, date, specificity: spec });
+    };
+    for (const s of directStmts) add("statement", s.id, s.date, 1);
+    for (const a of directActs) add("action", a.id, a.date, 1);
+    for (const s of topicStmts) add("statement", s.id, s.date, 0.6);
+    for (const a of topicActs) add("action", a.id, a.date, 0.6);
+    const events = [...byKey.values()];
+
+    const corroboration = corroborationScore(events.length);
+    const authority = t.authority ?? 1;
+    const tradeMagnitude = magnitudeScore(t.band);
 
     const scored = events
       .map((ev) => {
         const gap = daysBetween(t.date, ev.date);
-        const components: Components = {
-          temporalProximity: Math.round(Math.exp(-Math.abs(gap) / 14) * 1000) / 1000,
-          entitySpecificity: 1, // gazetteer matched the issuer directly
-          authority: 1, // the President has policy authority over every sector
-          directionalConsistency: 0.5, // expected price-impact direction not modelled in v1
-          tradeMagnitude: Math.round(magnitudeScore(t.band) * 1000) / 1000,
+        const components: ScoreComponents = {
+          temporalProximity: temporalProximity(gap),
+          entitySpecificity: ev.specificity,
+          authority,
+          tradeMagnitude,
           corroboration,
         };
         return { ev, gap, components, signal: score(components) };

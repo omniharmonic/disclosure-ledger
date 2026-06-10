@@ -1,5 +1,20 @@
 import type { Metadata } from "next";
 import { AMOUNT_BANDS } from "@/lib/bands";
+import {
+  WEIGHTS,
+  COMPONENT_DEFINITIONS,
+  SCORING_CHANGELOG,
+  SCORING_VERSION,
+  type ComponentName,
+} from "@/lib/scoring";
+
+const COMPONENT_NAMES: Record<ComponentName, string> = {
+  temporalProximity: "Temporal proximity",
+  entitySpecificity: "Entity specificity",
+  authority: "Authority",
+  tradeMagnitude: "Trade magnitude",
+  corroboration: "Corroboration",
+};
 
 export const metadata: Metadata = {
   title: "Methodology",
@@ -80,8 +95,10 @@ export default function MethodologyPage() {
           from whitehouse.gov.
         </li>
         <li>
-          <strong>Share prices:</strong> end-of-day price history from Stooq, used to chart
-          each company and mark the President&rsquo;s disclosed trades on the timeline.
+          <strong>Share prices:</strong> weekly end-of-day price history from Alpha Vantage
+          and current quotes from Finnhub, used to chart each company and mark the
+          President&rsquo;s disclosed trades. Prices are non-blocking enrichment — never part
+          of the disclosure record itself.
         </li>
       </ul>
 
@@ -97,14 +114,54 @@ export default function MethodologyPage() {
         scores low, an LLM adjudicator re-reads the source PDF under a strict schema.
       </p>
 
-      <H>Timing correlations</H>
+      <H>Timing correlations — scoring model v{SCORING_VERSION}</H>
       <p>
-        Each trade is scored for timing correlation against contemporaneous statements and
-        official actions using a transparent, multi-component model (temporal proximity,
-        entity specificity, authority, directional consistency, trade magnitude, and
-        corroboration). Every correlation displays its full component breakdown. The score is
-        an analytical index, never a verdict.
+        Each trade is scored against contemporaneous statements and official actions found in
+        an asymmetric window (45 days before to 30 days after the transaction date). An event
+        qualifies as a candidate when it names the traded company directly, or when it
+        addresses the company&rsquo;s sub-industry (e.g. &ldquo;semiconductors&rdquo; for a
+        chip maker). The composite 0–100 signal is a weighted sum of the components below —
+        the exact weights the engine uses, rendered from the same source file. Every
+        correlation displays its full component breakdown. The score is an analytical index,
+        never a verdict.
       </p>
+      <table className="my-2 w-full border-collapse text-xs">
+        <thead>
+          <tr className="border-b border-[var(--color-rule)] text-left text-[var(--color-muted)]">
+            <th className="py-1 pr-4 font-medium">Component</th>
+            <th className="py-1 pr-4 font-medium">Weight</th>
+            <th className="py-1 font-medium">Definition</th>
+          </tr>
+        </thead>
+        <tbody>
+          {(Object.keys(WEIGHTS) as ComponentName[]).map((k) => (
+            <tr key={k} className="border-b border-[var(--color-rule)] last:border-0 align-top">
+              <td className="py-1 pr-4 whitespace-nowrap font-medium">{COMPONENT_NAMES[k]}</td>
+              <td className="py-1 pr-4 tabular">{WEIGHTS[k].toFixed(2)}</td>
+              <td className="py-1 text-[var(--color-ink-soft)]">{COMPONENT_DEFINITIONS[k]}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p>
+        <strong>What is deliberately not in the model (yet):</strong> directional
+        consistency — whether the trade&rsquo;s direction aligns with an event&rsquo;s
+        expected price impact — requires price-impact modelling that v1 does not perform, so
+        it is excluded from the score rather than shown as a placeholder. Each correlation is
+        additionally passed through a reasoning check that asks whether the matched text is
+        genuinely about the company (and not a string coincidence like &ldquo;Southern
+        Co&rdquo; vs. &ldquo;the southern border&rdquo;); pairs judged coincidental are
+        removed from public view.
+      </p>
+
+      <H>Scoring changelog</H>
+      <ul className="list-disc space-y-1 pl-5">
+        {SCORING_CHANGELOG.map((c) => (
+          <li key={c.version}>
+            <strong>v{c.version}</strong> ({c.date}) — {c.change}
+          </li>
+        ))}
+      </ul>
 
       <H>Editorial discipline</H>
       <p>
@@ -126,7 +183,10 @@ export default function MethodologyPage() {
       </p>
 
       <H>Attribution</H>
-      <p>Project by Benjamin Life (@omniharmonic). Methodology version 1.1.</p>
+      <p>
+        Project by Benjamin Life (@omniharmonic). Scoring methodology version{" "}
+        {SCORING_VERSION} (see changelog above).
+      </p>
     </article>
   );
 }

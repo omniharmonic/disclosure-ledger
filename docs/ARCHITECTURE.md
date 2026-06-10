@@ -75,7 +75,7 @@ Vercel Workflows (GA April 2026) is technically the *right* durable-orchestratio
 | PDF parsing | `camelot` (lattice) + `pdfplumber` (cross-check) + Anthropic Claude (adjudicator) | Defense-in-depth extraction; see §4. |
 | LLM | Anthropic Claude API (structured tool use), with prompt caching | Quote-span extraction, parser adjudication, mention classification, caption speaker-segmentation. |
 | Caption retrieval | Supadata (free tier) | Fetches existing YouTube/C-SPAN caption tracks; no audio/ASR performed by this platform. |
-| Embeddings | `pgvector` in Neon | Semantic statement search/dedup; no separate vector DB. |
+| Embeddings | `pgvector` in Neon — **deferred (v1 ships without embeddings)** | Semantic statement search/dedup when added; content-hash dedup suffices at v1 scale. |
 | Styling | Tailwind CSS | Standard, fast. |
 | Charts | Recharts | Dashboard charts. |
 | Timeline | vis-timeline | Mature multi-lane event timeline. |
@@ -131,41 +131,51 @@ GET https://extapps2.oge.gov/201/Presiden.nsf/PAS+Index?ReadViewEntries&OutputFo
 |---|---|---|
 | Company name → ticker/CIK | SEC EDGAR `company_tickers.json` | No key; **User-Agent with contact email required**; 10 req/s. Cache the whole file. |
 | Ticker fallback (ADRs, funds, foreign) | OpenFIGI API | Free; higher limits with a free key. |
-| EOD price on transaction date | Tiingo | Free tier; EOD is sufficient (trades are dated). |
-| Price cross-check / current price | Financial Modeling Prep | Free tier (250 calls/day). |
+| EOD price history (charts) | Alpha Vantage `TIME_SERIES_WEEKLY` | Free tier — 25 req/day; tickers fetched in correlation-priority order, coverage fills in across daily runs. |
+| Current quote | Finnhub `/quote` | Free tier — 60 req/min; refreshed every run. |
 | Sector / industry | EDGAR SIC + GICS mapping | Derived from EDGAR. |
 
 ---
 
 ## 4. Trade Extraction Pipeline ("ironclad" parsing)
 
-The 278-T transaction table is a fully ruled grid: `# | Description | Type | Date | Amount`. Filings are text-based (no OCR). Extraction uses **defense-in-depth consensus**:
+> **Revised to describe the implemented design.** The original plan assumed text-based
+> PDFs and specified a camelot + pdfplumber row-diff consensus. The real filings turned
+> out to be **scanned documents** (some with a poor embedded OCR layer, the newest with
+> none), which ruled-grid extractors cannot read. The implemented pipeline is therefore
+> **Surya OCR → content-anchored parsing → validation gate → LLM adjudication**, described
+> below. A second independent extractor remains the upgrade path if a future filing
+> arrives text-based (see docs/EXTRACTION_UPGRADE.md).
+
+The 278-T transaction table is a ruled grid: `# | Description | Type | Date | Amount`.
 
 ```
-PDF ─┬─▶ camelot (lattice mode)      ─┐
-     ├─▶ pdfplumber (lines strategy) ─┼─▶ row-level diff ─▶ agree? ─▶ accept (confidence 1.0)
-     │                                │                  └▶ disagree ─▶ Claude adjudicator
-     └─▶ (irregular "See Attached Schedule" pages) ─────────────────▶ Claude structured extraction
+PDF ──▶ Surya OCR (per-page, cached) ──▶ content-anchored row parser ──▶ validation gate
+                                                                         │
+                              confidence < 0.9 + ANTHROPIC_API_KEY ──▶ Claude re-reads the
+                                                                       PDF under a strict
+                                                                       schema; result kept
+                                                                       only if it improves
 ```
 
-### 4.1 Extraction stages
+### 4.1 Extraction stages (implemented)
 
-1. **Primary — camelot `lattice`.** Purpose-built for ruled tables; outputs DataFrames with columns aligned to the grid.
-2. **Secondary — pdfplumber** with `vertical_strategy="lines"`. Independent extraction of the same rows.
-3. **Row-level diff.** Match rows by `#`; compare every field. Identical → accept at confidence 1.0.
-4. **Adjudicator — Claude tool use.** For disagreeing rows and irregular attached-schedule pages, send page text + a strict JSON schema. The model returns `{row_number, description, type ∈ {Purchase, Sale, Sale (Partial), Exchange}, date (ISO-8601), amount_band}`. Adjudicated rows get confidence 0.85 and a `parse_method = "llm_adjudicated"` tag.
+1. **OCR — Surya** (transformer OCR; far more accurate than Tesseract on degraded scans). Each page is rendered at ~216 DPI and OCR'd once; output cached in `data/cache/ocr/` (committed — deterministic and CPU-expensive).
+2. **Content-anchored parsing** (`pipeline/extract_278t.py`): each transaction row is located by its recognizable **amount band** and **transaction date** rather than fragile column geometry; description/type/late-flag are assigned by content pattern, with fuzzy type recovery for OCR-garbled type cells and bond-maturity-date exclusion.
+3. **Adjudicator — Claude tool use** (`src/pipeline/lib/adjudicator.ts`). When a filing scores below 0.9 and `ANTHROPIC_API_KEY` is configured, Claude re-reads the raw PDF under a strict JSON schema. A truncation guard ensures the LLM result is merged **only if it improves** on the heuristic; adjudicated filings carry `parse_method = "llm_adjudicated"`, confidence 0.92.
 
 ### 4.2 Validation gate (every filing must pass)
 
-- **Sequential `#`:** row numbers contiguous `1..N` per part — gaps/dupes fail.
-- **Page reconciliation:** parse the "Page X of Y" footer; confirm all Y pages ingested.
-- **Enum membership:** `type` and `amount` band must match closed vocabularies.
-- **Date sanity:** transaction date within the filing's covered period.
-- **Digital signature:** verify the embedded OGE PKCS#7 signature; record status.
-- **Cross-source reconciliation:** match each row (ticker + date + band) against ProPublica and/or Quiver; agreement on two independent sources = high confidence; divergence = review flag.
+- **Row validity:** real date, valid amount band, non-boilerplate description; per-filing confidence = validShare · (0.75 + 0.25·typeKnownShare) · (1 − 0.10·ocrShare).
+- **Page reconciliation:** parse the "Page X of Y" footer; confirm all Y pages ingested (mismatch discounts confidence).
+- **Enum membership:** `type` and amount band must match closed vocabularies (unknown type discounts but does not reject a row whose date/amount/description are sound).
+- **Date sanity:** transaction date within a plausible window of the filing year (excludes bond maturity dates).
+- **Sequential numbering:** OCR row numbers are unreliable, so rows are numbered in document order; integrity is enforced by page-count reconciliation and per-page row counts.
+- **Cross-source reconciliation:** match each row (ticker/description + date + band) against an independent structured dataset; agreement recorded in `reconciled_sources`, divergence flags review (`reconcile` stage).
 - **Idempotency:** SHA-256 of PDF bytes; UNID dedupe — re-polling never re-ingests.
+- **Digital signature:** *presence* of the embedded OGE PKCS#7 signature is detected and recorded; full cryptographic chain verification is deferred (`signature_verified` stays null until implemented).
 
-A filing scoring below the confidence threshold is stored but **withheld from the public view** and pushed to the review queue (FR-O3).
+A filing scoring below the confidence threshold (0.7) is stored but **withheld from the public view** — list pages, detail pages, and the API all enforce the public-status gate — and surfaced in the operator review queue (FR-O3).
 
 ### 4.3 Amount bands
 
@@ -287,7 +297,8 @@ CREATE TABLE statements (
   attribution_method TEXT NOT NULL,         -- official_transcript|caption_derived
   attribution_conf   REAL NOT NULL,         -- for caption_derived: speaker-segmentation confidence
   needs_review       BOOLEAN DEFAULT FALSE,
-  embedding          VECTOR(1536),          -- pgvector, for semantic search/dedup
+  -- embedding VECTOR(1536) — deferred: v1 dedupes by content_hash; pgvector
+  -- embeddings return with semantic search (see §2 Embeddings row).
   content_hash       TEXT UNIQUE,
   superseded_by      UUID REFERENCES statements(id),  -- CPD upgrade of a faster source
   created_at         TIMESTAMPTZ DEFAULT NOW()
@@ -434,20 +445,23 @@ For each transaction `T` (company `X`, transaction date `D`):
 2. Window: `[D − 45d, D + 30d]` (asymmetric — a trade *preceding* an action is a stronger signal than one reacting to it; window is configurable).
 3. Collect candidate statements (via `statement_mentions` touching `X` or its sector) and candidate actions (via `action_targets`) inside the window.
 
-### 6.2 Scoring model — "Potential Conflict Signal" (0–100)
+### 6.2 Scoring model — "Potential Conflict Signal" (0–100), v1.1
 
-Composite weighted sum; **every component is stored in `correlations.components` JSONB and displayed in the UI**.
+Composite weighted sum; **every component is stored in `correlations.components` JSONB and displayed in the UI**. The model lives in `src/lib/scoring.ts` — the methodology page renders the weights from the same constants the engine uses, so the published model can never drift from the executed one.
 
-| Component | Definition | Default weight |
+| Component | Definition | Weight (v1.1) |
 |---|---|---|
-| `temporal_proximity` | `exp(-|days_gap| / τ)`, τ = 14 days | 0.30 |
-| `entity_specificity` | direct issuer mention 1.0 · sub-industry 0.6 · broad sector 0.3 | 0.25 |
-| `authority` | does the filer have policy power over `X`? President ≈ 1.0 | 0.10 |
-| `directional_consistency` | trade direction aligns with the action's expected price impact (1.0 / 0.5 unknown / 0.0 opposite) | 0.15 |
-| `trade_magnitude` | log-normalized band midpoint, 0..1 | 0.10 |
-| `corroboration` | bonus for lobbying overlap / multiple events / repeated pattern | 0.10 |
+| `temporalProximity` | `exp(-|days_gap| / τ)`, τ = 14 days | 0.35 |
+| `entitySpecificity` | direct issuer mention 1.0 · sub-industry topic match 0.6 (`src/pipeline/lib/topics.ts`) | 0.25 |
+| `authority` | the filer's policy power over the traded company, from `persons.authority` (President 1.0) | 0.15 |
+| `tradeMagnitude` | log-normalized band midpoint, 0..1 | 0.10 |
+| `corroboration` | bonus for multiple distinct in-window events: `(events − 1) × 0.25`, capped at 1 | 0.15 |
 
-`signal_score = 100 × Σ wᵢ·componentᵢ`. Weights are versioned (`scoring_version`), published on the methodology page, and changelogged. Only pairs above a threshold (default 25) become `CORRELATES_WITH` graph edges.
+`signal_score = 100 × Σ wᵢ·componentᵢ`. Weights are versioned (`scoring_version`), published on the methodology page, and changelogged (`SCORING_CHANGELOG`). Only pairs above a threshold (default 25) become `CORRELATES_WITH` graph edges.
+
+**Deliberately excluded (v1.1):** `directional_consistency` — whether the trade's direction aligns with the event's expected price impact. v1.0 carried it as a hardcoded 0.5 placeholder, which rendered as a flat half-marks bar implying analysis that did not occur; it was removed rather than faked, and returns when price-impact direction modelling lands.
+
+Re-scoring **upserts** on the unique (transaction, event_kind, statement, action) pair and prunes stale pairs by a `refreshed_at` stamp — it never truncates, so `verified_genuine` verdicts (LLM or human) survive every run.
 
 ### 6.3 Framing discipline
 
