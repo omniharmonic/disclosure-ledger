@@ -10,10 +10,14 @@ export interface ApiMeta {
 }
 
 /** Consistent JSON envelope so the website and API never diverge. */
-export function apiOk<T>(data: T, meta: ApiMeta = {}): NextResponse {
+export function apiOk<T>(
+  data: T,
+  meta: ApiMeta = {},
+  headers: Record<string, string> = {},
+): NextResponse {
   return NextResponse.json(
     { data, meta: { ...meta, generatedAt: new Date().toISOString() } },
-    { headers: { "Cache-Control": "public, max-age=300, s-maxage=300" } },
+    { headers: { "Cache-Control": "public, max-age=300, s-maxage=300", ...headers } },
   );
 }
 
@@ -46,6 +50,33 @@ export const transactionsQuery = z.object({
   bandMin: z.coerce.number().int().min(1).max(10).optional(),
   sortBy: z.enum(["date", "amount", "description"]).default("date"),
   order: z.enum(["asc", "desc"]).default("desc"),
+  page: pageParam,
+  limit: limitParam,
+});
+
+export const statementsQuery = z.object({
+  dateFrom: dateParam.optional(),
+  dateTo: dateParam.optional(),
+  channel: z.string().max(40).optional(),
+  ticker: z.string().max(12).optional(),
+  page: pageParam,
+  limit: limitParam,
+});
+
+export const actionsQuery = z.object({
+  dateFrom: dateParam.optional(),
+  dateTo: dateParam.optional(),
+  type: z.string().max(40).optional(),
+  ticker: z.string().max(12).optional(),
+  page: pageParam,
+  limit: limitParam,
+});
+
+export const correlationsQuery = z.object({
+  transactionId: uuidParam.optional(),
+  ticker: z.string().max(12).optional(),
+  kind: z.enum(["statement", "action"]).optional(),
+  minScore: z.coerce.number().min(0).max(100).optional(),
   page: pageParam,
   limit: limitParam,
 });

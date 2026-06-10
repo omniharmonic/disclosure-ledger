@@ -6,7 +6,7 @@
  * exposed publicly; `review` and `pending` filings are withheld until a human
  * confirms them (PRD FR-O3, NFR "Accuracy").
  */
-import { db } from "@/db";
+import { dbRo as db } from "@/db";
 import {
   filings,
   transactions,
@@ -14,6 +14,7 @@ import {
   statements,
   statementMentions,
   actions,
+  actionTargets,
   correlations,
   graphEdges,
   persons,
@@ -652,6 +653,223 @@ export async function getTimelineEvents(limit = 600): Promise<TimelineEvent[]> {
       related: topRel(byEvent.get(a.id)),
     })),
   ];
+}
+
+// ---------------------------------------------------------------------------
+// Public API list queries (FR-API1) — same gating rules as the site.
+// ---------------------------------------------------------------------------
+
+export interface StatementFilter {
+  dateFrom?: string;
+  dateTo?: string;
+  channel?: string;
+  ticker?: string;
+  page?: number;
+  limit?: number;
+}
+
+/** Public statements, newest first; optionally only those mentioning a ticker. */
+export async function listStatements(filter: StatementFilter = {}) {
+  const page = Math.max(1, filter.page ?? 1);
+  const limit = Math.min(200, Math.max(1, filter.limit ?? 50));
+
+  const conds = [];
+  if (filter.dateFrom) conds.push(gte(statements.spokenAt, filter.dateFrom));
+  if (filter.dateTo) conds.push(lte(statements.spokenAt, filter.dateTo));
+  if (filter.channel) conds.push(eq(statements.channel, filter.channel));
+
+  const base = db
+    .selectDistinctOn([statements.spokenAt, statements.id], {
+      id: statements.id,
+      spokenAt: statements.spokenAt,
+      channel: statements.channel,
+      venue: statements.venue,
+      fullText: statements.fullText,
+      source: statements.source,
+      sourceUrl: statements.sourceUrl,
+      attributionMethod: statements.attributionMethod,
+      attributionConf: statements.attributionConf,
+    })
+    .from(statements);
+
+  if (filter.ticker) {
+    const rows = await base
+      .innerJoin(statementMentions, eq(statementMentions.statementId, statements.id))
+      .innerJoin(companies, eq(statementMentions.companyId, companies.id))
+      .where(and(...conds, eq(companies.ticker, filter.ticker)))
+      .orderBy(desc(statements.spokenAt), statements.id)
+      .limit(limit)
+      .offset((page - 1) * limit);
+    const [{ value: total }] = await db
+      .select({ value: sql<number>`count(distinct ${statements.id})` })
+      .from(statements)
+      .innerJoin(statementMentions, eq(statementMentions.statementId, statements.id))
+      .innerJoin(companies, eq(statementMentions.companyId, companies.id))
+      .where(and(...conds, eq(companies.ticker, filter.ticker)));
+    return { rows, total: Number(total) };
+  }
+
+  const rows = await base
+    .where(conds.length ? and(...conds) : undefined)
+    .orderBy(desc(statements.spokenAt), statements.id)
+    .limit(limit)
+    .offset((page - 1) * limit);
+  const [{ value: total }] = await db
+    .select({ value: count() })
+    .from(statements)
+    .where(conds.length ? and(...conds) : undefined);
+  return { rows, total: Number(total) };
+}
+
+export interface ActionFilter {
+  dateFrom?: string;
+  dateTo?: string;
+  type?: string;
+  ticker?: string;
+  page?: number;
+  limit?: number;
+}
+
+/** Official actions, newest first; optionally only those affecting a ticker. */
+export async function listActions(filter: ActionFilter = {}) {
+  const page = Math.max(1, filter.page ?? 1);
+  const limit = Math.min(200, Math.max(1, filter.limit ?? 50));
+
+  const conds = [];
+  if (filter.dateFrom) conds.push(gte(actions.occurredOn, filter.dateFrom));
+  if (filter.dateTo) conds.push(lte(actions.occurredOn, filter.dateTo));
+  if (filter.type) conds.push(eq(actions.actionType, filter.type));
+
+  const base = db
+    .selectDistinctOn([actions.occurredOn, actions.id], {
+      id: actions.id,
+      actionType: actions.actionType,
+      occurredOn: actions.occurredOn,
+      signedOn: actions.signedOn,
+      title: actions.title,
+      summary: actions.summary,
+      source: actions.source,
+      sourceRef: actions.sourceRef,
+      sourceUrl: actions.sourceUrl,
+    })
+    .from(actions);
+
+  if (filter.ticker) {
+    const rows = await base
+      .innerJoin(actionTargets, eq(actionTargets.actionId, actions.id))
+      .innerJoin(companies, eq(actionTargets.companyId, companies.id))
+      .where(and(...conds, eq(companies.ticker, filter.ticker)))
+      .orderBy(desc(actions.occurredOn), actions.id)
+      .limit(limit)
+      .offset((page - 1) * limit);
+    const [{ value: total }] = await db
+      .select({ value: sql<number>`count(distinct ${actions.id})` })
+      .from(actions)
+      .innerJoin(actionTargets, eq(actionTargets.actionId, actions.id))
+      .innerJoin(companies, eq(actionTargets.companyId, companies.id))
+      .where(and(...conds, eq(companies.ticker, filter.ticker)));
+    return { rows, total: Number(total) };
+  }
+
+  const rows = await base
+    .where(conds.length ? and(...conds) : undefined)
+    .orderBy(desc(actions.occurredOn), actions.id)
+    .limit(limit)
+    .offset((page - 1) * limit);
+  const [{ value: total }] = await db
+    .select({ value: count() })
+    .from(actions)
+    .where(conds.length ? and(...conds) : undefined);
+  return { rows, total: Number(total) };
+}
+
+export interface CorrelationListFilter {
+  transactionId?: string;
+  ticker?: string;
+  kind?: "statement" | "action";
+  minScore?: number;
+  page?: number;
+  limit?: number;
+}
+
+/** Public correlations with their event payloads, highest signal first. */
+export async function listCorrelations(filter: CorrelationListFilter = {}) {
+  const page = Math.max(1, filter.page ?? 1);
+  const limit = Math.min(200, Math.max(1, filter.limit ?? 50));
+
+  const conds = [
+    inArray(filings.status, [...PUBLIC_FILING_STATUSES]),
+    sql`${correlations.verifiedGenuine} is not false`,
+  ];
+  if (filter.transactionId) conds.push(eq(correlations.transactionId, filter.transactionId));
+  if (filter.ticker) conds.push(eq(companies.ticker, filter.ticker));
+  if (filter.kind) conds.push(eq(correlations.eventKind, filter.kind));
+  if (filter.minScore != null) conds.push(gte(correlations.signalScore, filter.minScore));
+
+  const select = {
+    id: correlations.id,
+    transactionId: correlations.transactionId,
+    eventKind: correlations.eventKind,
+    statementId: correlations.statementId,
+    actionId: correlations.actionId,
+    daysGap: correlations.daysGap,
+    signalScore: correlations.signalScore,
+    components: correlations.components,
+    scoringVersion: correlations.scoringVersion,
+    transactionDate: transactions.transactionDate,
+    transactionType: transactions.transactionType,
+    ticker: companies.ticker,
+    statementText: statements.fullText,
+    statementDate: statements.spokenAt,
+    statementUrl: statements.sourceUrl,
+    actionTitle: actions.title,
+    actionDate: actions.occurredOn,
+    actionUrl: actions.sourceUrl,
+  };
+
+  const rows = await db
+    .select(select)
+    .from(correlations)
+    .innerJoin(transactions, eq(correlations.transactionId, transactions.id))
+    .innerJoin(filings, eq(transactions.filingId, filings.id))
+    .leftJoin(companies, eq(transactions.companyId, companies.id))
+    .leftJoin(statements, eq(correlations.statementId, statements.id))
+    .leftJoin(actions, eq(correlations.actionId, actions.id))
+    .where(and(...conds))
+    .orderBy(desc(correlations.signalScore))
+    .limit(limit)
+    .offset((page - 1) * limit);
+
+  const [{ value: total }] = await db
+    .select({ value: count() })
+    .from(correlations)
+    .innerJoin(transactions, eq(correlations.transactionId, transactions.id))
+    .innerJoin(filings, eq(transactions.filingId, filings.id))
+    .leftJoin(companies, eq(transactions.companyId, companies.id))
+    .where(and(...conds));
+
+  return { rows, total: Number(total) };
+}
+
+/**
+ * Iterate every public transaction in stable order — the bulk-export feed
+ * (FR-API5). Yields pages so the export route can stream without holding the
+ * full dataset in memory.
+ */
+export async function* iterateAllTransactions(pageSize = 1000) {
+  let page = 1;
+  for (;;) {
+    const { rows } = await listTransactions({
+      page,
+      limit: Math.min(200, pageSize),
+      sortBy: "date",
+      order: "asc",
+    });
+    if (rows.length === 0) return;
+    yield rows;
+    if (rows.length < Math.min(200, pageSize)) return;
+    page++;
+  }
 }
 
 /** Headline statistics for the dashboard. */

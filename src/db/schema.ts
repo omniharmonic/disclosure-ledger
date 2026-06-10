@@ -313,6 +313,21 @@ export const apiKeys = pgTable("api_keys", {
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
 });
 
+/**
+ * Operational — per-subject daily API usage counters (FR-API2). Subject is a
+ * key id for authenticated calls or a hashed client IP for anonymous ones.
+ * One row per (subject, day); incremented atomically on every request.
+ */
+export const apiUsage = pgTable(
+  "api_usage",
+  {
+    subject: text("subject").notNull(),
+    day: date("day").notNull(),
+    count: integer("count").default(0).notNull(),
+  },
+  (t) => [uniqueIndex("uq_api_usage").on(t.subject, t.day)],
+);
+
 export type Person = typeof persons.$inferSelect;
 export type Company = typeof companies.$inferSelect;
 export type Filing = typeof filings.$inferSelect;
