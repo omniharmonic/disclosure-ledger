@@ -71,11 +71,40 @@ jobs:
           DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
           ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          RECONCILE_DATA_URL: ${{ secrets.RECONCILE_DATA_URL }}
           CRAWLER_USER_AGENT: "trump-stock-tracker civic-transparency project (contact: benjamin@opencivics.co)"
         run: npx tsx src/pipeline/run.ts all
+
+      # Provenance durability: the actions/cache above is evictable (7-day
+      # idle eviction, 10 GB repo cap) — never the only home of source PDFs.
+      # Artifacts give a second, longer-lived copy of every raw filing.
+      - name: Archive raw source PDFs (provenance)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-pdfs-${{ github.run_id }}
+          path: data/pdfs/
+          if-no-files-found: ignore
+          retention-days: 90
 
       - name: Trigger site revalidation
         if: success() && env.REVALIDATE_URL != ''
         env:
           REVALIDATE_URL: ${{ secrets.REVALIDATE_URL }}
         run: curl -fsS "$REVALIDATE_URL" || true
+
+      # FR-O4 — the daily pipeline alerts on failure. Default GH email is
+      # easy to miss; a repo issue is visible and assignable.
+      - name: Open an issue on pipeline failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Pipeline failure — $(date -u +%Y-%m-%d)"
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "in:title \"$title\"" --json number --jq length)
+          if [ "$existing" = "0" ]; then
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "$title" \
+              --label pipeline-failure \
+              --body "The scheduled ingestion run failed. See run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} — check \`ingestion_runs\` for the failing stage."
+          fi

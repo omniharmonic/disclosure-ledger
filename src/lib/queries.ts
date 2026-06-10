@@ -61,6 +61,7 @@ export interface TransactionRow {
   filingId: string;
   filingDate: string;
   sourceUrl: string;
+  reconciledSources: string[] | null;
 }
 
 const SORT_COLUMNS = {
@@ -109,6 +110,7 @@ export async function listTransactions(
       filingId: transactions.filingId,
       filingDate: filings.filingDate,
       sourceUrl: filings.sourceUrl,
+      reconciledSources: transactions.reconciledSources,
     })
     .from(transactions)
     .innerJoin(filings, eq(transactions.filingId, filings.id))
@@ -152,6 +154,7 @@ export async function getTransaction(id: string): Promise<TransactionRow | null>
       filingId: transactions.filingId,
       filingDate: filings.filingDate,
       sourceUrl: filings.sourceUrl,
+      reconciledSources: transactions.reconciledSources,
     })
     .from(transactions)
     .innerJoin(filings, eq(transactions.filingId, filings.id))
@@ -284,6 +287,7 @@ export async function getCompany(ticker: string) {
       filingId: transactions.filingId,
       filingDate: filings.filingDate,
       sourceUrl: filings.sourceUrl,
+      reconciledSources: transactions.reconciledSources,
     })
     .from(transactions)
     .innerJoin(filings, eq(transactions.filingId, filings.id))

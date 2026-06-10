@@ -22,6 +22,20 @@ function sha256(buf: Buffer): string {
   return createHash("sha256").update(buf).digest("hex");
 }
 
+/**
+ * Detect an embedded PDF digital-signature structure (OGE filings carry a
+ * PKCS#7 signature from the certifying official). Presence only — recorded
+ * as provenance (FR-T3 first step); cryptographic chain verification is a
+ * separate, deferred step and `signature_verified` stays null until then.
+ */
+export function detectSignature(bytes: Buffer): boolean {
+  const head = bytes.toString("latin1");
+  return (
+    head.includes("/ByteRange") &&
+    (head.includes("adbe.pkcs7") || head.includes("ETSI.CAdES") || head.includes("/Sig"))
+  );
+}
+
 async function hashExists(hash: string): Promise<boolean> {
   const rows = await db
     .select({ id: filings.id })
@@ -67,6 +81,7 @@ export async function fetchFilings(candidates: FilingCandidate[]): Promise<Fetch
         sourceDomain: c.sourceDomain,
         pdfHash: hash,
         rawPdfPath: path,
+        signaturePresent: detectSignature(bytes),
         status: "pending",
       });
       result.fetched++;

@@ -12,7 +12,7 @@
  */
 import { db } from "@/db";
 import { companies, statements, statementMentions, actions, actionTargets } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { SECTOR_TOPICS } from "../lib/topics";
 
 /**
@@ -245,9 +245,19 @@ export async function detectMentions(): Promise<MentionResult> {
     .select({ id: actions.id, title: actions.title, summary: actions.summary })
     .from(actions);
   for (const a of acts) {
-    await db.delete(actionTargets).where(eq(actionTargets.actionId, a.id));
+    // Re-derive text-based links only; contract_recipient links come from the
+    // USAspending ingester with authoritative recipient data — preserve them.
+    await db
+      .delete(actionTargets)
+      .where(
+        and(eq(actionTargets.actionId, a.id), ne(actionTargets.linkMethod, "contract_recipient")),
+      );
+    const preserved = await db
+      .select({ companyId: actionTargets.companyId })
+      .from(actionTargets)
+      .where(eq(actionTargets.actionId, a.id));
     const text = `${a.title}\n${a.summary ?? ""}`;
-    const seen = new Set<string>();
+    const seen = new Set<string>(preserved.map((p) => p.companyId).filter((c): c is string => !!c));
     for (const g of gaz) {
       if (seen.has(g.companyId)) continue;
       if (findSpans(text, g).length > 0) {

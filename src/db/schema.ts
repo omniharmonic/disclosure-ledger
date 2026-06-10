@@ -82,6 +82,13 @@ export const filings = pgTable(
     rawPdfPath: text("raw_pdf_path"),
     pageCount: integer("page_count"),
     transactionCount: integer("transaction_count"),
+    /**
+     * An embedded PKCS#7 signature structure was detected in the PDF
+     * (provenance signal). Distinct from signatureVerified, which stays null
+     * until full cryptographic chain verification is implemented — presence
+     * is never presented as verification.
+     */
+    signaturePresent: boolean("signature_present"),
     signatureVerified: boolean("signature_verified"),
     parseMethod: text("parse_method"), // 'consensus' | 'llm_adjudicated'
     parseConfidence: real("parse_confidence"), // 0..1

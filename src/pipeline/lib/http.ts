@@ -94,3 +94,42 @@ export async function fetchBytes(url: string, opts?: FetchOptions): Promise<Buff
   if (!res.ok) throw new Error(`HTTP ${res.status} fetching bytes from ${redactUrl(url)}`);
   return Buffer.from(await res.arrayBuffer());
 }
+
+/** POST JSON, same throttling/retry/identification as politeFetch. */
+export async function fetchJsonPost<T = unknown>(
+  url: string,
+  body: unknown,
+  opts: FetchOptions = {},
+): Promise<T> {
+  const { retries = 3, timeoutMs = 60_000, userAgent } = opts;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    await throttle(url);
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "User-Agent": userAgent ?? USER_AGENT,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      if (res.status === 429 || res.status >= 500) {
+        throw new Error(`HTTP ${res.status} from ${redactUrl(url)}`);
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status} posting to ${redactUrl(url)}`);
+      return (await res.json()) as T;
+    } catch (err) {
+      lastErr = err;
+      if (attempt < retries) await sleep(2_000 * (attempt + 1));
+    }
+  }
+  throw new Error(
+    `fetchJsonPost failed after ${retries + 1} attempts for ${redactUrl(url)}: ${redactUrl(String(lastErr))}`,
+  );
+}
